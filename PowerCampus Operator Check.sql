@@ -45,3 +45,5 @@ LEFT JOIN ABT_SETTINGS abts on aup.OPERATOR_ID = abts.SECTION_NAME
 	AND SETTING = 'Y'
 WHERE P.PEOPLE_ID IN
 	(@p1, @p2)
+
+SELECT NEWID() [Random Password]
