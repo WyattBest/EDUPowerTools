@@ -11,18 +11,27 @@ GO
 -- =============================================
 -- Author:		Wyatt Best
 -- Create date: 2018-07-10
--- Description:	Sends an email via the MessageQueue table and related tables. Set-based instead of using a loop. Adds MCNY header, footer, and optionally body styling.
---				Requires #Messages table to already exist with the columns specified below.
---				#Messages will be de-duplicated. Messages where a [to] email can't be found will be deleted.
---				The output is a similarly constructed table of messages sent along with the MESSAGEIDs.
+-- Description:	Easily send emails via MESSAGEQUEUE. Adds MCNY header, footer, and optionally body styling.
+--
+--				Features:	A) Set-based. No loops or dynamic SQL!
+--							B) Accepts PEOPLE_CODE_ID's and/or emails. Easy to send messages without looking up addresses.
+--							B) Most columns are optional.
+--							C) Message are automatically de-duplicated. Messages where a [to] email can't be found will be discarded.
+--							D) Can accept and return an input key with each message, making it easy to use Scheduled Actions to generate messages and mark actions complete.
+--
+--				Requires #Messages table as input; this table should already exist in the session.
+--				Outputs a similarly constructed table containing messages sent along with new MESSAGEID's from MESSAGEQUEUE.
 --				Depends on MCNY custom functions Get_MCNYEmail and Get_AltEmail.
 --
+-- Changelog:
 -- 2019-10-31 Wyatt Best:	Updated https://selfservice.mcny.edu/SST/App_Themes/Default/Images/MCNY_logo_cp.gif to https://legacy.mcny.edu/App_Themes/Default/Images/MCNY_logo_cp.gif
 --							Moved to [custom] schema and renamed from [dbo].[MCNY_SP_SendEmails]
 -- 2019-12-05 Wyatt Best:	Made some columns optional. Made [toId] nullable. Added more validation logic.
 --
--- TODO:	Replace XACT_ABORT with TRY/CATCH.
---			Add validation of PEOPLE_CODE_ID's.
+-- TODO:
+--		Replace XACT_ABORT with TRY/CATCH.
+--		Add validation of PEOPLE_CODE_ID's.
+--		Replace Get_MCNYEmail and Get_AltEmail with vista view.
 --
 -- Usage: Select some emails into #Messages table as shown above. Then EXEC [dbo].[MCNY_SP_SendEmails].
 --		  People Code Id's can be used instead of actual email addresses.
@@ -44,34 +53,23 @@ O		,[bccId] NVARCHAR(10) NULL				--bcc recipient People Code Id
 O		,[uniqueKey] NVARCHAR(255) NULL	UNIQUE	--Can be used by caller to compare input and output rows. Suggest using [ACTIONSCHEDULE].[UNIQUE_KEY] for this purpose.
 		);
 
-	INSERT INTO #Messages
-	VALUES
-		('selfservice@mcny.edu'
-			,NULL
-			,NULL
-			,'P000157172'
-			,0
-			,'wyattbest@gmail.com'
-			,NULL
-			,NULL
-			,NULL
-			,'Test Email 4'
-			,'This is a test of the stored procedure [dbo].[MCNY_SP_SendEmails].'
-			,1)
-		,('selfservice@mcny.edu'
-			,NULL
-			,'asmith@mcny.edu'
-			,'P000141351'
-			,0
-			,NULL
-			,'P000157172'
-			,NULL
-			,NULL
-			,'Test Email 5'
-			,'This is a test of the stored procedure [dbo].[MCNY_SP_SendEmails].'
-			,1);
 
-	EXEC [dbo].[MCNY_SP_SendEmails]
+--Simple example usage
+
+	SELECT 'helpdesk@mcny.edu'		[from]
+		,PEOPLE_CODE_ID				[toId]
+		,0							[toTypeFlag] --Use Campus email
+		,'Welcome'					[subject]
+		,'You''re receiving this email because you''re enrolled at our wonderful school!' [body]
+		,1							[formatBodyFlag]
+	INTO #Messages
+	FROM ACADEMIC
+	WHERE ACADEMIC_YEAR = '2020'
+		AND ACADEMIC_TERM = 'SPRING'
+		AND CREDITS > 0
+
+	EXEC [custom].spSendEmails;
+
 */
 -- =============================================
 CREATE PROCEDURE [custom].[spSendEmails]
