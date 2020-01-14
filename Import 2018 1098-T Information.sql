@@ -3,9 +3,12 @@ GO
 
 --Use extreme caution and test, test, test! This script comes with no warranty!
 
---Some schools weren't able to update to PowerCampus 8.8.4 in time for the 2018 tax year 1098-T forms; they chose to run the process in upgraded database copies instead.
---This script brings that data back into the main database. Ellucian recommends re-running the process instead of copying with SQL, but there are various scenarios in which that isn't possible.
---Replace 'OtherDB' with the name of the isolated database contianing 1098-T information.
+--Some schools weren't able to update to PowerCampus 8.8.4 in time for the 2018 tax year 1098-T forms;
+--	they chose to run the process in upgraded database copies instead.
+--This script brings that data back into the main database. Ellucian recommends re-running the process instead of copying with SQL,
+--	but there are various scenarios in which that isn't possible.
+
+--Replace 'OtherDB' with the name of the isolated database containing 1098-T information.
 
 --The second half of this file is various comparison queries to try and validate the imported data. 
 
