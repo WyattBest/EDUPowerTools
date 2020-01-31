@@ -27,6 +27,7 @@ GO
 -- 2019-10-31 Wyatt Best:	Updated https://selfservice.mcny.edu/SST/App_Themes/Default/Images/MCNY_logo_cp.gif to https://legacy.mcny.edu/App_Themes/Default/Images/MCNY_logo_cp.gif
 --							Moved to [custom] schema and renamed from [dbo].[MCNY_SP_SendEmails]
 -- 2019-12-05 Wyatt Best:	Made some columns optional. Made [toId] nullable. Added more validation logic.
+-- 2020-01-31 Wyatt Best:	Added missing step to supply [from] from [fromId].
 --
 -- TODO:
 --		Replace XACT_ABORT with TRY/CATCH.
@@ -168,6 +169,12 @@ BEGIN
 		ADD [uniqueKey] NVARCHAR(255) NULL
 	END;
 	
+	--Supply [from] when only [fromId] is present
+	UPDATE #Messages
+	SET [from] = dbo.fnGetPrimaryEmail([fromId])
+	WHERE [from] IS NULL
+		AND [fromId] IS NOT NULL
+
 	--A stupid step to prevent compiler from erroring because it doesn't recognize the new columns as existing.
 	--Might be able to remove in a future version of SQL Server.
 	SELECT * INTO #MessagesIntermediate
