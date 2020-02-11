@@ -1,7 +1,3 @@
-USE [Campus6]
-GO
-
-/****** Object:  StoredProcedure [custom].[spSendEmails]    Script Date: 2020-01-14 10:40:52 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -28,6 +24,8 @@ GO
 --							Moved to [custom] schema and renamed from [dbo].[MCNY_SP_SendEmails]
 -- 2019-12-05 Wyatt Best:	Made some columns optional. Made [toId] nullable. Added more validation logic.
 -- 2020-01-31 Wyatt Best:	Added missing step to supply [from] from [fromId].
+-- 2020-02-11 Wyatt Best:	Moved step to supply [from] from [fromId] to #MessagesIntermediate to solve issue where compiler falsly believes the column doesn't exist.
+--							Added error check for at least one sender column.
 --
 -- TODO:
 --		Replace XACT_ABORT with TRY/CATCH.
@@ -101,6 +99,27 @@ BEGIN
 		END
 	END
 
+	--Make sure we have a sender column specified
+	IF 'from' NOT IN (
+			SELECT [name]
+			FROM tempdb.sys.columns
+			WHERE [object_id] = OBJECT_ID('tempdb..#Messages')
+			)
+	BEGIN
+		IF 'fromId' NOT IN (
+				SELECT [name]
+				FROM tempdb.sys.columns
+				WHERE [object_id] = OBJECT_ID('tempdb..#Messages')
+				)
+		BEGIN
+			RAISERROR (
+					'#Messages must contain at least one sender column ([from], [fromId]).'
+					,11
+					,1
+					)
+		END
+	END
+
 	CREATE TABLE #MessagesStrict (
 		[msKey] INT IDENTITY PRIMARY KEY		--Identity key used internally by the procedure
 		,[from] NVARCHAR(255) NOT NULL			--an email address
@@ -169,16 +188,16 @@ BEGIN
 		ADD [uniqueKey] NVARCHAR(255) NULL
 	END;
 	
+	--A stupid step to prevent compiler from erroring because it doesn't recognize the new columns as existing.
+	--Might be able to remove in a future version of SQL Server.
+	SELECT * INTO #MessagesIntermediate
+	FROM #Messages;
+
 	--Supply [from] when only [fromId] is present
 	UPDATE #Messages
 	SET [from] = dbo.fnGetPrimaryEmail([fromId])
 	WHERE [from] IS NULL
 		AND [fromId] IS NOT NULL
-
-	--A stupid step to prevent compiler from erroring because it doesn't recognize the new columns as existing.
-	--Might be able to remove in a future version of SQL Server.
-	SELECT * INTO #MessagesIntermediate
-	FROM #Messages;
 
 	--Create a 'strict' version, discarding any extra input and de-duplicating.
 	INSERT INTO #MessagesStrict (
