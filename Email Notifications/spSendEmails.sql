@@ -1,6 +1,5 @@
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
 
@@ -140,6 +139,12 @@ BEGIN
 
 	
 	--Add optional columns
+	IF 'from' NOT IN (SELECT [name] FROM tempdb.sys.columns WHERE [object_id] = OBJECT_ID('tempdb..#Messages'))
+	BEGIN
+		ALTER TABLE #Messages
+		ADD [from] NVARCHAR(255) NULL
+	END;
+
 	IF 'fromId' NOT IN (SELECT [name] FROM tempdb.sys.columns WHERE [object_id] = OBJECT_ID('tempdb..#Messages'))
 	BEGIN
 		ALTER TABLE #Messages
@@ -194,7 +199,7 @@ BEGIN
 	FROM #Messages;
 
 	--Supply [from] when only [fromId] is present
-	UPDATE #Messages
+	UPDATE #MessagesIntermediate
 	SET [from] = dbo.fnGetPrimaryEmail([fromId])
 	WHERE [from] IS NULL
 		AND [fromId] IS NOT NULL
