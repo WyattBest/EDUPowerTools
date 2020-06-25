@@ -1,4 +1,4 @@
-use Campus6;
+USE Campus6;
 
 -- Usage:
 --		Finds instances of a particular code value (text string) by column name.
@@ -18,7 +18,8 @@ DECLARE @SearchColumn NVARCHAR(100) = 'EVENT_SUB_TYPE' --Column name
 	,@SearchValue NVARCHAR(100) = 'LECT' --Code value to search for
 	--Optional. If @AcademicYear and @AcademicTerm are not NULL, results will be limited in tables containing these columns.
 	,@AcademicYear NVARCHAR(4) = '2020'
-	,@AcademicTerm NVARCHAR(10) = 'FALL';
+	,@AcademicTerm NVARCHAR(10) = 'FALL'
+	,@ReturnNonYTTables BIT = 0; --Allows returning only tables with YT columns
 
 
 /*
@@ -66,9 +67,10 @@ INNER JOIN INFORMATION_SCHEMA.TABLES T1
 		AND T1.TABLE_SCHEMA = 'dbo'
 		AND T1.TABLE_TYPE = 'BASE TABLE'
 WHERE COLUMN_NAME IN (@SearchColumn, 'CODE_VALUE_KEY')
-	AND DATA_TYPE IN ('NVARCHAR', 'VARCHAR')
-	--Idk what these are? Vestigal?
-	AND T1.TABLE_NAME NOT IN ('EVENTSESSIONS', 'EVENTSCHEDULE');
+	AND DATA_TYPE IN ('NVARCHAR', 'VARCHAR');
+
+IF @ReturnNonYTTables = 0
+	DELETE FROM #ToSearch WHERE YTCols = 0;
 
 CREATE TABLE #Results
 	(
@@ -88,11 +90,14 @@ BEGIN
 		,@TableYTCols = YTCols
 	FROM #ToSearch;
 
-	--WHERE clause for academic year and term
-	IF (@TableYTCols = 1)
-		SELECT @YTSql = ' AND ACADEMIC_YEAR = ''' + @AcademicYear + ''' AND ACADEMIC_TERM = ''' + @AcademicTerm + '''';
-	ELSE
-		SELECT @YTSql = '';
+	--WHERE clause for academic year and term. Special handling for two tables without ACADEMIC_YEAR.
+	SELECT @YTSql = CASE 
+		WHEN (@TableYTCols = 1 AND @TargetTable NOT IN ('EVENTSESSIONS', 'EVENTSCHEDULE'))
+			THEN (' AND ACADEMIC_YEAR = ''' + @AcademicYear + ''' AND ACADEMIC_TERM = ''' + @AcademicTerm + '''')
+		WHEN (@TableYTCols = 1 AND @TargetTable IN ('EVENTSESSIONS', 'EVENTSCHEDULE'))
+			THEN (' AND ACADEMIC_TERM = ''' + @AcademicTerm + '''')
+		ELSE ''
+		END;
 
 	--First check if search table contains target value
 	SELECT @TestSql = 'SELECT @Cnt = COUNT(*) FROM ' + @TargetTable + ' WHERE ' + @TargetColumn + ' = ''' + @SearchValue + '''' + @YTSql;
