@@ -16,10 +16,12 @@ USE Campus6;
 
 DECLARE @SearchColumn NVARCHAR(100) = 'EVENT_SUB_TYPE' --Column name
 	,@SearchValue NVARCHAR(100) = 'LECT' --Code value to search for
+
 	--Optional. If @AcademicYear and @AcademicTerm are not NULL, results will be limited in tables containing these columns.
+	--Does not yet handle the 9 tables with [AcademicYear] and [AcademicTerm] columns.
 	,@AcademicYear NVARCHAR(4) = '2020'
 	,@AcademicTerm NVARCHAR(10) = 'FALL'
-	,@ReturnNonYTTables BIT = 0; --Allows returning only tables with YT columns
+	,@ReturnNonYTTables BIT = 0; --Allows returning only tables with YT columns.
 
 
 /*
@@ -88,7 +90,8 @@ BEGIN
 		,@TargetColumn = COLUMN_NAME
 		,@TargetId = ID
 		,@TableYTCols = YTCols
-	FROM #ToSearch;
+	FROM #ToSearch
+	ORDER BY TABLE_NAME;
 
 	--WHERE clause for academic year and term. Special handling for two tables without ACADEMIC_YEAR.
 	SELECT @YTSql = CASE 
