@@ -14,8 +14,8 @@ use Campus6;
 -- 2020-06-24 Wyatt Best:	Added optional limit by ACADEMIC_YEAR and ACADEMIC_TERM.
 --							Limited searches to [dbo] schema to prevent unexpected behavior.
 
-DECLARE @SearchColumn NVARCHAR(100) = 'SECTION' --Column name
-	,@SearchValue NVARCHAR(100) = 'DST1' --Code value to search for
+DECLARE @SearchColumn NVARCHAR(100) = 'EVENT_SUB_TYPE' --Column name
+	,@SearchValue NVARCHAR(100) = 'LECT' --Code value to search for
 	--Optional. If @AcademicYear and @AcademicTerm are not NULL, results will be limited in tables containing these columns.
 	,@AcademicYear NVARCHAR(4) = '2020'
 	,@AcademicTerm NVARCHAR(10) = 'FALL';
@@ -66,10 +66,9 @@ INNER JOIN INFORMATION_SCHEMA.TABLES T1
 		AND T1.TABLE_SCHEMA = 'dbo'
 		AND T1.TABLE_TYPE = 'BASE TABLE'
 WHERE COLUMN_NAME IN (@SearchColumn, 'CODE_VALUE_KEY')
-	AND DATA_TYPE IN ('NVARCHAR', 'VARCHAR');
-
-
-
+	AND DATA_TYPE IN ('NVARCHAR', 'VARCHAR')
+	--Idk what these are? Vestigal?
+	AND T1.TABLE_NAME NOT IN ('EVENTSESSIONS', 'EVENTSCHEDULE');
 
 CREATE TABLE #Results
 	(
@@ -102,7 +101,7 @@ BEGIN
 	--If target value is found, return matching rows from table currently being searched
 	IF (@TestCount > 0)
 	BEGIN
-		SELECT @Sql = 'SELECT * FROM ' + @TargetTable + ' WHERE ' + @TargetColumn + ' = ''' + @SearchValue + '''' + @YTSql;
+		SELECT @Sql = 'SELECT ''' + @TargetTable +  ''' [TableName], * FROM ' + @TargetTable + ' WHERE ' + @TargetColumn + ' = ''' + @SearchValue + '''' + @YTSql;
 		
 		PRINT @Sql;
 		SET NOCOUNT OFF
