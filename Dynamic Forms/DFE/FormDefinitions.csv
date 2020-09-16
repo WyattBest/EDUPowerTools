@@ -1,0 +1,2 @@
+﻿TypeFlag,FormId,GetStatuses,SetStatus,XSLT,OutputPath,ImageFileName,Autofile,TestMode
+/i,<GUID>,0,1,FormBasic.xslt,\\server\Folder\Folder,{PEOPLE_CODE_ID}_BookAdvance,FALSE,FALSE
