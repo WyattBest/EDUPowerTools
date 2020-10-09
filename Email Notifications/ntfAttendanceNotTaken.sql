@@ -1,13 +1,12 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[ntfAttendanceNotTaken]    Script Date: 2020-01-14 10:48:36 ******/
+/****** Object:  StoredProcedure [custom].[ntfAttendanceNotTaken]    Script Date: 2020-10-09 09:27:55 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 -- =============================================
 -- Author:		Wyatt Best
@@ -16,6 +15,13 @@ GO
 --
 -- 2020-01-08 Wyatt Best:	Changed date logic to 8 days after meeting for distance courses and 2 days after meeting for in-person courses.
 --							Changed email sender to program director, who will be stored in curriculum code table "Version 4.X Code" field.
+-- 2020-02-19 Wyatt Best:	Put into production.
+-- 2020-04-15 Wyatt Best:	Because Summer 2020 may be entirely remote, adjusted synchronous sections to 8 days grace.
+-- 2020-05-26 Wyatt Best:	Excluded independent study sections.
+-- 2020-07-22 Wyatt Best:	Excluded MBA foundation courses.
+-- 2020-08-06 Wyatt Best:	Excluded students who withdrew from the entire term.
+-- 2020-08-31 Wyatt Best:	Fix error in last change (PEOPLE_CODE vs PEOPLE_ID in join).
+-- 2020-10-09 Wyatt Best:	Exclude students who withdrew from section (not dropped).
 -- =============================================
 CREATE PROCEDURE [custom].[ntfAttendanceNotTaken]
 AS
@@ -27,7 +33,7 @@ BEGIN
 	--Email subject and body
 	DECLARE @Subject NVARCHAR(100) = 'Attendance Not Taken'
 		,@Body NVARCHAR(MAX) = '<p>Dear Professor {{LAST_NAME}},</p>
-									<p>According to the college''s records, you did not report attendance for {{Missing}} {{students}} in <strong>{{EVENT_ID}} / {{SECTION}}</strong> for the meeting on <strong>{{CALENDAR_DATE}}</strong>.</p>
+									<p>According to the college''s records, you did not report attendance for {{Missing}} {{students}} in <strong>{{EVENT_ID}} / {{SECTION}}</strong> on class meeting date <strong>{{CALENDAR_DATE}}</strong>.</p>
 									<p>Please address this matter as soon as possible.</p>
 									<p><a href="https://selfservice.mcny.edu/Classes/CourseManagement">Self-Service Course Management</a></p>'
 	DECLARE @AcademicYear NVARCHAR(4) = (
@@ -49,6 +55,12 @@ BEGIN
 		,COUNT(TD.PEOPLE_ID) [Missing] --Number of students missing attendance for this meeting
 	INTO #AttendanceNotTaken
 	FROM TRANSCRIPTDETAIL TD
+	INNER JOIN [custom].vwACADEMIC A
+		ON A.PEOPLE_ID = TD.PEOPLE_ID
+			AND A.ACADEMIC_YEAR = TD.ACADEMIC_YEAR
+			AND A.ACADEMIC_TERM = TD.ACADEMIC_TERM
+			AND A.ACADEMIC_SESSION = TD.ACADEMIC_SESSION
+			AND A.ENROLL_SEPARATION = 'ENRL' --Exclude students who withdrew from the term
 	INNER JOIN SECTIONS S
 		ON S.ACADEMIC_YEAR = TD.ACADEMIC_YEAR
 			AND S.ACADEMIC_TERM = TD.ACADEMIC_TERM
@@ -64,7 +76,6 @@ BEGIN
 			AND TD.EVENT_ID = SS.EVENT_ID
 			AND TD.EVENT_SUB_TYPE = SS.EVENT_SUB_TYPE
 			AND TD.SECTION = SS.SECTION
-			AND TD.ADD_DROP_WAIT = 'A'
 	INNER JOIN CALENDARDETAIL CD
 		ON CD.EVENT_KEY = SS.CALENDARDET_EVENT_KEY
 	INNER JOIN CALENDAR C
@@ -74,6 +85,16 @@ BEGIN
 			AND TA.PEOPLE_ID = TD.PEOPLE_ID
 	WHERE TD.ACADEMIC_YEAR = @AcademicYear
 		AND TD.ACADEMIC_TERM = @AcademicTerm
+		AND TD.ADD_DROP_WAIT = 'A' --Exclude students who dropped
+		--Exclude students who withdrew from the section (not dropped)
+		AND TD.FINAL_GRADE NOT IN (
+			SELECT GRADE
+			FROM GRADEVALUES GV
+			WHERE GV.ACADEMIC_YEAR = TD.ACADEMIC_YEAR
+				AND GV.ACADEMIC_TERM = TD.ACADEMIC_TERM
+				AND GV.CREDIT_TYPE = TD.CREDIT_TYPE
+				AND WITHDRAWN_GRADE = 'Y'
+			)
 		AND (
 			(
 				--Eight days after for online courses
@@ -83,10 +104,13 @@ BEGIN
 			OR (
 				--Two days after for in-person courses
 				LEFT(S.SECTION, 1) <> 'D'
-				AND DATEDIFF(DAY, CALENDAR_DATE, GETDATE()) = 2
+				--AND DATEDIFF(DAY, CALENDAR_DATE, GETDATE()) = 2
+				AND DATEDIFF(DAY, CALENDAR_DATE, GETDATE()) = 8
 				)
 			)
 		AND TA.TranAttendanceId IS NULL --Only students WITHOUT attendance recorded
+		AND S.SECTION NOT LIKE 'MIS%' --Do not include independent study sections
+		AND S.SECTION NOT LIKE 'MBA 50[1-4] FDN' --Do not include MBA foundation sections
 	GROUP BY c.CALENDAR_KEY
 		,TD.ACADEMIC_YEAR
 		,TD.ACADEMIC_TERM
@@ -137,7 +161,7 @@ BEGIN
 				END)
 
 	UPDATE #Messages
-	SET body = REPLACE(body, '{{LAST_NAME}}', dbo.fnPeopleOrgName(PEOPLE_CODE_ID, 'LN |SX')) --Display name using Ellucian's name format fuction
+	SET body = REPLACE(body, '{{LAST_NAME}}', dbo.fnPeopleOrgName(PEOPLE_CODE_ID, 'LN')) --Display name using Ellucian's name format fuction
 
 	UPDATE #Messages
 	SET body = REPLACE(body, '{{EVENT_ID}}', EVENT_ID)
@@ -156,5 +180,3 @@ BEGIN
 
 	COMMIT TRAN SendEmails
 END
-GO
-
