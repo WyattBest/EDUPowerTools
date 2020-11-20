@@ -1,13 +1,10 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[DFselSSCartContents]    Script Date: 2020-11-12 15:27:10 ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 -- =============================================
 -- Author:		Wyatt Best
@@ -35,12 +32,10 @@ BEGIN
 		FROM [custom].vwACADEMIC A
 		WHERE 1 = 1
 			AND A.PEOPLE_CODE_ID = C.PEOPLE_CODE_ID
-			AND A.TermId < OT.TermId
+			AND A.TermId <= OT.TermId
 		ORDER BY A.TermId DESC
 		) A
 	WHERE 1 = 1
 		AND C.PEOPLE_CODE_ID = @PCID
 		AND A.ADVISOR = @AdvisorID
 END
-GO
-
