@@ -1,8 +1,10 @@
 USE [Campus6]
 GO
 
+/****** Object:  StoredProcedure [custom].[DFselSSCartContentsHTML]    Script Date: 2020-11-24 11:50:52 ******/
 SET ANSI_NULLS ON
 GO
+
 SET QUOTED_IDENTIFIER ON
 GO
 
@@ -10,6 +12,8 @@ GO
 -- Author:		Wyatt Best
 -- Create date: 2020-11-02
 -- Description:	Selects Self-Service cart sections in HTML table format.
+--
+-- 2020-11-24: Changed authorization model to allow any advisor to modify any cart, not just My Advisees.
 -- =============================================
 CREATE PROCEDURE [custom].[DFselSSCartContentsHTML] @PCID NVARCHAR(10)
 	,@AdvisorID NVARCHAR(10)
@@ -17,9 +21,19 @@ AS
 BEGIN
 	SET NOCOUNT ON;
 
+	DECLARE @Authorized BIT = 0;
+
 	--Adjust @PCID
 	IF LEN(@PCID) = 9
 		SET @PCID = 'P' + @PCID
+
+	--If @AdvisorID truly is an advisor, set Authorized = True. @AdvisorID is supplied via SSO.
+	IF @AdvisorID IN (
+			SELECT PEOPLE_CODE_ID
+			FROM PEOPLETYPE
+			WHERE PEOPLE_TYPE = 'ADV'
+			)
+		SET @Authorized = 1
 
 	SELECT (
 			'<style type="text/css">table.sections {
@@ -62,21 +76,13 @@ BEGIN
 							INNER JOIN [custom].vwOrderedTerms OT
 								ON OT.ACADEMIC_YEAR = C.ACADEMIC_YEAR
 									AND OT.ACADEMIC_TERM = C.ACADEMIC_TERM
-							OUTER APPLY (
-								SELECT TOP 1 *
-								FROM [custom].vwACADEMIC A
-								WHERE 1 = 1
-									AND A.PEOPLE_CODE_ID = C.PEOPLE_CODE_ID
-									AND A.TermId <= OT.TermId
-								ORDER BY A.TermId DESC
-								) A
 							WHERE 1 = 1
 								AND C.PEOPLE_CODE_ID = @PCID
-								AND A.ADVISOR = @AdvisorID
+								AND @Authorized = 1
 							FOR XML RAW('tr')
 								,ELEMENTS
 								,TYPE
-							), '<td>Nothing found. Perhaps the student is not your advisee?</td><td></td><td></td><td></td>') AS 'tbody'
+							), '<td>Nothing found. The cart is empty or you are not authorized.</td><td></td><td></td><td></td>') AS 'tbody'
 				FOR XML PATH('table')
 				)
 			) AS [HTML]
