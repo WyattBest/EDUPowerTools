@@ -1,13 +1,10 @@
 USE [Campus6]
 GO
-
-/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2020-09-23 11:53:57 ******/
+/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2020-11-24 14:30:08 ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 -- =============================================
 -- Author:		Wyatt Best
@@ -17,6 +14,7 @@ GO
 --
 -- 2020-09-02 Wyatt Best:	Changed logic from completely excluding DST% from holiday adjustments to looking at meeting length to determine sync vs async.
 --							Set Community Health Education programs to start on second week.
+-- 2020-11-24 Wyatt Best:	Set all meetings to remote after Thanksgiving.
 -- =============================================
 CREATE PROCEDURE [custom].[spUpdateSectionMeetings] @AcademicYear NVARCHAR(4)
 	,@AcademicTerm NVARCHAR(10)
@@ -122,22 +120,25 @@ BEGIN
 			AND DATEDIFF(minute, C.START_TIME, C.END_TIME) > 10 --Synchronous sections only
 
 		--Move alternating weeks to ONLINE
+		--Move anything after Thanksgiving to ONLINE
 		UPDATE C
 		SET BUILDING_CODE = 'ONLINE'
 			,ROOM_ID = 'ONLINE'
 		FROM CALENDAR C
 		INNER JOIN #SectionMeetings SM
 			ON SM.CALENDAR_KEY = C.CALENDAR_KEY
-		WHERE TargetPattern <> WeekOddEven;
+		WHERE TargetPattern <> WeekOddEven
+			OR SM.CALENDAR_DATE > '2020-11-27';
 
-		--Move alternating weeks to on campus (necessary for subsequent runs when the number of weeks has changed)
+		--Move alternating weeks to on campus (necessary for subsequent runs when the number of weeks has changed) except dates after Thanksgiving
 		UPDATE C
 		SET BUILDING_CODE = SM.BUILDING_CODE
 			,ROOM_ID = SM.ROOM_ID
 		FROM CALENDAR C
 		INNER JOIN #SectionMeetings SM
 			ON SM.CALENDAR_KEY = C.CALENDAR_KEY
-		WHERE TargetPattern = WeekOddEven;
+		WHERE TargetPattern = WeekOddEven
+			AND SM.CALENDAR_DATE < '2020-11-27';
 
 		--Update SCHEDULED_MEETINGS counter (for consistent display in client)
 		WITH CTE_SectionMeetings
@@ -177,5 +178,3 @@ BEGIN
 		DROP TABLE #SectionMeetings;
 	END
 END
-GO
-
