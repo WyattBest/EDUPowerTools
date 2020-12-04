@@ -1,6 +1,9 @@
 from stat import S_ISREG
 import pysftp
 
+# This is intended to be called from Windows Task Scheduler.
+# Download EOD file from server, place in appropriate folder, and delete from server.
+
 # remote_dir = 'qa'
 remote_dir = 'prod'
 dir_local = '\\\\<servername>\\c$\\NBSEODFiles\\'
