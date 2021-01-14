@@ -1,7 +1,7 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[ntfStudentWeeklySchedule]    Script Date: 01/14/2021 10:06:13 ******/
+/****** Object:  StoredProcedure [custom].[ntfStudentWeeklySchedule]    Script Date: 01/14/2021 10:07:19 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -19,6 +19,8 @@ GO
 --							Added ORDER BY clause to sync schedule table.
 -- 2020-10-05 Wyatt Best:	Exclude nontraditional program LDRHS students.
 -- 2021-01-08 Wyatt Best:	Updated for new room name, ZOOM. Also changed hardcoded TermId to variable. Safer if we forget to update this, but dangerous if Acal dates are wrong.
+-- 2021-01-14 Wyatt Best:	New functionality to display holiday meetings being held asynchronously in their own table.
+--							Added new column to underlying view, REGULAR_DAY. Allows for easier detection of async courses as well as detecting async meetings for sections that are normally sync.
 -- =============================================
 CREATE PROCEDURE [custom].[ntfStudentWeeklySchedule]
 AS
@@ -66,6 +68,8 @@ BEGIN
 		<p>Synchronous courses meet on a specific day and time.</p>
 		{{SyncSchedule}}
 		<p>Before you enter campus each day, you must fill out the <a href="https://forms.mcny.edu/screening/">health screening form.</a></p>
+		{{HolidayAdjustmentsHeader}}
+		{{HolidaySchedule}}
 		<h2>Classes Meeting Asynchronously</h2>
 		<p>Asynchronous format courses require various activities each week in <a href="https://moodle.mcny.edu">Moodle</a> or as directed by your professor instead of meeting on campus or on Zoom.</p>
 		{{AsyncSchedule}}
@@ -88,6 +92,7 @@ BEGIN
 		AND CAST(CALENDAR_DATE AS DATE) BETWEEN @Monday AND DATEADD(day, 6, @Monday) --Week range
 		AND DATEDIFF(minute, START_TIME, END_TIME) > 10;
 
+	--AND REGULAR_DAY <> 'DIST';
 	--Query all async sections for the term
 	SELECT DISTINCT PEOPLE_ID
 		,EVENT_ID
@@ -96,6 +101,19 @@ BEGIN
 	INTO #SectionsAsync
 	FROM [custom].vwSectionMeetingsStudent
 	WHERE TermId = @TermId
+		--AND DATEDIFF(minute, START_TIME, END_TIME) < 10;
+		AND REGULAR_DAY = 'DIST';
+
+	--Query holiday section meetings moved from sync to async format for the week
+	SELECT DISTINCT PEOPLE_ID
+		,EVENT_ID
+		,SECTION
+		,EVENT_LONG_NAME
+	INTO #SectionsHoliday
+	FROM [custom].vwSectionMeetingsStudent
+	WHERE TermId = @TermId
+		AND CAST(CALENDAR_DATE AS DATE) BETWEEN @Monday AND DATEADD(day, 6, @Monday) --Week range
+		AND REGULAR_DAY <> 'DIST'
 		AND DATEDIFF(minute, START_TIME, END_TIME) < 10;
 
 	--Build list of enrolled students and HTML tables of their sync and async course meetings
@@ -177,6 +195,36 @@ BEGIN
 						), '<td>Nothing scheduled.</td><td></td>') AS 'tbody'
 			FOR XML PATH('table')
 			) [AsyncSchedule]
+		,(
+			SELECT 'merged' AS [@class]
+				,(
+					SELECT 'Course' [th]
+						,'Section' [th]
+					FOR XML raw('tr')
+						,ELEMENTS
+						,TYPE
+					) AS 'thead'
+				,COALESCE((
+						SELECT EVENT_ID + ': ' + EVENT_LONG_NAME [td]
+							,SECTION [td]
+						FROM #SectionsHoliday SH
+						WHERE 1 = 1
+							AND SH.PEOPLE_ID = A.PEOPLE_ID
+						FOR XML RAW('tr')
+							,ELEMENTS
+							,TYPE
+						), '<td>Nothing scheduled.</td><td></td>') AS 'tbody'
+			FOR XML PATH('table')
+			) [HolidaySchedule]
+		,CASE 
+			WHEN EXISTS (
+					SELECT *
+					FROM #SectionsHoliday SH
+					WHERE SH.PEOPLE_ID = A.PEOPLE_ID
+					)
+				THEN 1
+			ELSE 0
+			END [HolidayFlag]
 	INTO #Messages
 	FROM [custom].vwACADEMIC A
 	INNER JOIN PEOPLE P
@@ -207,6 +255,23 @@ BEGIN
 	SET body = REPLACE(body, '{{DisplayName}}', DisplayName)
 
 	UPDATE #Messages
+	SET body = REPLACE(body, '{{HolidayAdjustmentsHeader}}', CASE 
+				WHEN [HolidayFlag] = 1
+					THEN '<h2>Temporary Holiday Adjustments</h2>
+					<p>The following courses are not meeting synchronously this week due to a holiday.
+					Instead, your instructor will require asynchronous participation (assignments, discussion forums, etc.) for this week''s attendance.
+					Please check Moodle or contact your instructor for more details.</p>'
+				ELSE ''
+				END)
+
+	UPDATE #Messages
+	SET body = REPLACE(body, '{{HolidaySchedule}}', CASE 
+				WHEN [HolidayFlag] = 1
+					THEN HolidaySchedule
+				ELSE ''
+				END)
+
+	UPDATE #Messages
 	SET body = REPLACE(body, '{{SyncSchedule}}', SyncSchedule)
 
 	UPDATE #Messages
@@ -221,6 +286,7 @@ BEGIN
 
 	DROP TABLE #SectionMeetingsSync
 		,#SectionsAsync
+		,#SectionsHoliday
 		,#Messages;
 END
 GO
