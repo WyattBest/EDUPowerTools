@@ -1,12 +1,13 @@
 USE [Campus6]
 GO
 
-/****** Object:  View [custom].[vwSectionMeetingsStudent]    Script Date: 2020-10-01 11:08:03 ******/
+/****** Object:  View [custom].[vwSectionMeetingsStudent]    Script Date: 01/14/2021 08:24:11 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 
 
@@ -21,6 +22,7 @@ Description:
 
 Revision History:
 2020-08-31 Wyatt Best: Created
+2021-01-13 Wyatt Best: Added column REGULAR_DAY to allow easily identifying section meetings that deviate from the normal day, such as holiday adjustments.
 
 ************************************************************************/
 SELECT TD.PEOPLE_CODE_ID
@@ -44,6 +46,7 @@ SELECT TD.PEOPLE_CODE_ID
 	,S.DEPARTMENT
 	--,S.[START_DATE]
 	--,S.[END_DATE]
+	,SS.[DAY] [REGULAR_DAY]
 	,CALENDAR_DATE
 	,C.START_TIME
 	,C.END_TIME
