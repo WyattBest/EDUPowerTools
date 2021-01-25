@@ -1,12 +1,13 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[ntfAttendanceNotTaken]    Script Date: 2020-10-09 09:27:55 ******/
+/****** Object:  StoredProcedure [custom].[ntfAttendanceNotTaken]    Script Date: 01/25/2021 10:25:29 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 -- =============================================
 -- Author:		Wyatt Best
@@ -22,11 +23,18 @@ GO
 -- 2020-08-06 Wyatt Best:	Excluded students who withdrew from the entire term.
 -- 2020-08-31 Wyatt Best:	Fix error in last change (PEOPLE_CODE vs PEOPLE_ID in join).
 -- 2020-10-09 Wyatt Best:	Exclude students who withdrew from section (not dropped).
+-- 2021-01-25 Wyatt Best:	Changed COUNT(TD.PEOPLE_ID) to COUNT(DISTINCT TD.PEOPLE_ID) to account for students who have multiple PDC's in a term.
+--							Changed criteria to look at preceding academic week (Mon-Sun) instead of days after meeting. Process will only run on Tuesday mornings.
 -- =============================================
 CREATE PROCEDURE [custom].[ntfAttendanceNotTaken]
 AS
 BEGIN
-	SET XACT_ABORT ON;--Stop on all errors.
+	SET XACT_ABORT ON --Stop on all errors.
+	SET NOCOUNT ON;
+
+	--If it's not Tuesday, exit immediately
+	IF DATEPART(WEEKDAY, GETDATE()) <> 3
+		RETURN
 
 	BEGIN TRAN SendEmails
 
@@ -52,7 +60,7 @@ BEGIN
 		,TD.EVENT_SUB_TYPE
 		,S.CURRICULUM
 		,CALENDAR_DATE
-		,COUNT(TD.PEOPLE_ID) [Missing] --Number of students missing attendance for this meeting
+		,COUNT(DISTINCT TD.PEOPLE_ID) [Missing] --Number of students missing attendance for this meeting
 	INTO #AttendanceNotTaken
 	FROM TRANSCRIPTDETAIL TD
 	INNER JOIN [custom].vwACADEMIC A
@@ -95,19 +103,20 @@ BEGIN
 				AND GV.CREDIT_TYPE = TD.CREDIT_TYPE
 				AND WITHDRAWN_GRADE = 'Y'
 			)
-		AND (
-			(
-				--Eight days after for online courses
-				LEFT(S.SECTION, 1) = 'D'
-				AND DATEDIFF(DAY, CALENDAR_DATE, GETDATE()) = 8
-				)
-			OR (
-				--Two days after for in-person courses
-				LEFT(S.SECTION, 1) <> 'D'
-				--AND DATEDIFF(DAY, CALENDAR_DATE, GETDATE()) = 2
-				AND DATEDIFF(DAY, CALENDAR_DATE, GETDATE()) = 8
-				)
-			)
+		--AND (
+		--	(
+		--		--Eight days after for online courses
+		--		LEFT(S.SECTION, 1) = 'D'
+		--		AND DATEDIFF(DAY, CALENDAR_DATE, GETDATE()) = 8
+		--		)
+		--	OR (
+		--		--Two days after for in-person courses
+		--		LEFT(S.SECTION, 1) <> 'D'
+		--		--AND DATEDIFF(DAY, CALENDAR_DATE, GETDATE()) = 2
+		--		AND DATEDIFF(DAY, CALENDAR_DATE, GETDATE()) = 8
+		--		)
+		--	)
+		AND CALENDAR_DATE BETWEEN CAST(GETDATE() - 7 AS DATE) AND CAST(GETDATE() - 1 AS DATE) --Within the previous academic week (Monday-Sunday)
 		AND TA.TranAttendanceId IS NULL --Only students WITHOUT attendance recorded
 		AND S.SECTION NOT LIKE 'MIS%' --Do not include independent study sections
 		AND S.SECTION NOT LIKE 'MBA 50[1-4] FDN' --Do not include MBA foundation sections
@@ -180,3 +189,5 @@ BEGIN
 
 	COMMIT TRAN SendEmails
 END
+GO
+
