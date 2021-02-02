@@ -1,7 +1,7 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[ntfAttendanceNotTaken]    Script Date: 01/25/2021 10:25:29 ******/
+/****** Object:  StoredProcedure [custom].[ntfAttendanceNotTaken]    Script Date: 02/02/2021 10:11:04 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -25,6 +25,7 @@ GO
 -- 2020-10-09 Wyatt Best:	Exclude students who withdrew from section (not dropped).
 -- 2021-01-25 Wyatt Best:	Changed COUNT(TD.PEOPLE_ID) to COUNT(DISTINCT TD.PEOPLE_ID) to account for students who have multiple PDC's in a term.
 --							Changed criteria to look at preceding academic week (Mon-Sun) instead of days after meeting. Process will only run on Tuesday mornings.
+-- 2021-02-02 Wyatt Best:	Changed joins to use PEOPLE_CODE_ID instead of PEOPLE_ID because it runs much faster.
 -- =============================================
 CREATE PROCEDURE [custom].[ntfAttendanceNotTaken]
 AS
@@ -60,11 +61,11 @@ BEGIN
 		,TD.EVENT_SUB_TYPE
 		,S.CURRICULUM
 		,CALENDAR_DATE
-		,COUNT(DISTINCT TD.PEOPLE_ID) [Missing] --Number of students missing attendance for this meeting
+		,COUNT(DISTINCT TD.PEOPLE_CODE_ID) [Missing] --Number of students missing attendance for this meeting
 	INTO #AttendanceNotTaken
 	FROM TRANSCRIPTDETAIL TD
 	INNER JOIN [custom].vwACADEMIC A
-		ON A.PEOPLE_ID = TD.PEOPLE_ID
+		ON A.PEOPLE_CODE_ID = TD.PEOPLE_CODE_ID
 			AND A.ACADEMIC_YEAR = TD.ACADEMIC_YEAR
 			AND A.ACADEMIC_TERM = TD.ACADEMIC_TERM
 			AND A.ACADEMIC_SESSION = TD.ACADEMIC_SESSION
@@ -90,7 +91,7 @@ BEGIN
 		ON C.EVENT_KEY = CD.EVENT_KEY
 	LEFT JOIN TRANATTENDANCE TA
 		ON TA.CalendarKey = C.CALENDAR_KEY
-			AND TA.PEOPLE_ID = TD.PEOPLE_ID
+			AND TA.PEOPLE_CODE_ID = TD.PEOPLE_CODE_ID
 	WHERE TD.ACADEMIC_YEAR = @AcademicYear
 		AND TD.ACADEMIC_TERM = @AcademicTerm
 		AND TD.ADD_DROP_WAIT = 'A' --Exclude students who dropped
@@ -116,7 +117,7 @@ BEGIN
 		--		AND DATEDIFF(DAY, CALENDAR_DATE, GETDATE()) = 8
 		--		)
 		--	)
-		AND CALENDAR_DATE BETWEEN CAST(GETDATE() - 7 AS DATE) AND CAST(GETDATE() - 1 AS DATE) --Within the previous academic week (Monday-Sunday)
+		AND CALENDAR_DATE BETWEEN CAST(GETDATE() - 8 AS DATE) AND CAST(GETDATE() - 2 AS DATE) --Within the previous academic week (Monday-Sunday)
 		AND TA.TranAttendanceId IS NULL --Only students WITHOUT attendance recorded
 		AND S.SECTION NOT LIKE 'MIS%' --Do not include independent study sections
 		AND S.SECTION NOT LIKE 'MBA 50[1-4] FDN' --Do not include MBA foundation sections
