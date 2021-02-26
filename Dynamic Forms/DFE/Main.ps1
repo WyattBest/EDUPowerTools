@@ -10,13 +10,15 @@ $StatusTrace = $null
 try {
     $DFEexe = "C:\Program Files\NextGen\Dynamic Forms Exchange\NextGen.DynamicForms.Exchange.exe"
     $FileCabinet = 'C:\DFE\TestFC'
-    Set-Location 'C:\DFE'
+    $WorkingDir = 'C:\DFE'
+    Set-Location $WorkingDir
 
     # Load a list of forms to download. This list can be updated in Excel.
     $FormDefinitions = Import-CSV FormDefinitions.csv
 
     # Execute Dynamic Forms Exchange for each form in the list
     foreach ($Form in $FormDefinitions) {
+        Set-Location $WorkingDir
         Switch ($Form.TypeFlag) {
             '/i' { $StyleSheetFlag = '/iss' }
             '/s' { $StyleSheetFlag = '/ss' }
@@ -36,7 +38,8 @@ try {
             , "/statuses $($Form.GetStatuses)"
             , $SetStatusFlag
             , "/updatedformstatusvalue $($Form.SetStatus)"
-            , '/silent')
+            , '/silent'
+            , '/appendattachments')
         $DFEArguments = $DFEArguments | Where-Object { $_ } # Get rid of null/empty parameters
         Write-Host $DFEArguments
         Start-Process -FilePath $DFEexe -ArgumentList $DFEArguments -RedirectStandardError 'stderr.tmp' -RedirectStandardOutput 'stdout.tmp' -Wait -NoNewWindow 
@@ -110,6 +113,7 @@ catch {
     $StatusTrace = $_.ScriptStackTrace
 }
 finally {
+    Set-Location $WorkingDir
     # Zeros because, insanely enough, a blank will break Invoke-Sqlcmd
     Write-Host $StatusCode, $StatusMessage, $StatusTrace
     if (!$StatusMessage) { $StatusMessage = 0 }
