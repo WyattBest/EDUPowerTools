@@ -1,13 +1,12 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 01/14/2021 10:00:05 ******/
+/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2021-03-09 11:37:55 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 -- =============================================
 -- Author:		Wyatt Best
@@ -20,8 +19,9 @@ GO
 -- 2020-11-24 Wyatt Best:	Set all meetings to remote after Thanksgiving.
 -- 2021-01-08 Wyatt Best:	Bunch of changes for Spring 2021.
 -- 2021-01-13 Wyatt Best:	Move 2021-01-18 and 2021-01-21 sections to async format.
+-- 2021-03-09 Wyatt Best:	Added year/term limitation on setting ROOM_ID = ZOOM.
 -- =============================================
-CREATE PROCEDURE [custom].[spUpdateSectionMeetings] @AcademicYear NVARCHAR(4)
+ALTER PROCEDURE [custom].[spUpdateSectionMeetings] @AcademicYear NVARCHAR(4)
 	,@AcademicTerm NVARCHAR(10)
 AS
 BEGIN
@@ -40,7 +40,9 @@ BEGIN
 		--Update room ONLINE to ZOOM for fully online, synchronous classes
 		UPDATE SECTIONSCHEDULE
 		SET ROOM_ID = 'ZOOM'
-		WHERE ROOM_ID = 'ONLINE'
+		WHERE ACADEMIC_YEAR = @AcademicYear
+			AND ACADEMIC_TERM = @AcademicTerm
+			AND ROOM_ID = 'ONLINE'
 			AND DATEDIFF(minute, START_TIME, END_TIME) > 10 --Synchronous sections only
 			AND [DAY] = 'DIST'
 
@@ -192,5 +194,3 @@ BEGIN
 		DROP TABLE #SectionMeetings;
 	END
 END
-GO
-
