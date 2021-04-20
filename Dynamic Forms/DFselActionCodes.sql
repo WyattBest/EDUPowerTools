@@ -1,19 +1,20 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[DFselAdvisor]    Script Date: 2020-12-08 13:44:39 ******/
+/****** Object:  StoredProcedure [custom].[DFselActionCodes]    Script Date: 2021-04-20 14:23:30 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
 
+
 -- =============================================
 -- Author:		Wyatt Best
 -- Create date: 2020-12-08
 -- Description:	Returns Action definitions for a specific office (or all offices).
 -- =============================================
-ALTER PROCEDURE [custom].[DFselActionCodes] @Office NVARCHAR(10) = NULL
+CREATE PROCEDURE [custom].[DFselActionCodes] @Office NVARCHAR(10) = NULL
 	,@Type NVARCHAR(6) = NULL
 AS
 BEGIN
@@ -46,5 +47,4 @@ BEGIN
 	ORDER BY ACTION_NAME
 END
 GO
-
 

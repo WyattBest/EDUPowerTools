@@ -1,18 +1,21 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[DFselActionCodes]    Script Date: 2021-01-12 10:24:02 ******/
+/****** Object:  StoredProcedure [custom].[DFinsViolation]    Script Date: 2021-04-20 14:20:15 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
 
+
 -- =============================================
 -- Author:		Wyatt Best
 -- Create date: 2021-01-12
 -- Description:	Inserts a record into the VIOLATIONS table if it doesn't already exist for that PCID + Y/T/S + EVENT_ID/SECTION/EVENT_SUB_TYPE.
 --				Used by the LEC to track which sections a student is receiving tutoring for.
+--
+-- 2021-01-22 Wyatt Best:	Immediately exit if @TranscriptDetailId is is blank or null.
 -- =============================================
 CREATE PROCEDURE [custom].[DFinsViolation] @TranscriptDetailId INT
 	,@Violation NVARCHAR(10)
@@ -43,6 +46,11 @@ BEGIN
 	IF @ViolationDate = ''
 		OR @ViolationDate IS NULL
 		SET @ViolationDate = @Today
+
+	--Dynamic Forms doesn't have conditional logic for executing API's on submit, so this sproc will sometimes be called unnecessarily.
+	IF @TranscriptDetailId = ''
+		OR @TranscriptDetailId IS NULL
+		RETURN
 
 	--Error checking
 	IF NOT EXISTS (
@@ -150,3 +158,5 @@ BEGIN
 	ELSE
 		SELECT 0 [InsertedCount]
 END
+GO
+

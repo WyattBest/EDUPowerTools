@@ -1,7 +1,7 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[DFselACADEMICCurrent]    Script Date: 2020-10-16 11:55:12 ******/
+/****** Object:  StoredProcedure [custom].[DFselACADEMICCurrent]    Script Date: 2021-04-20 14:20:48 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -13,6 +13,8 @@ GO
 -- Author:		Wyatt Best
 -- Create date: 2020-07-02
 -- Description:	Returns current PDC, credits, and ENROLL_SEPARATION for a student.
+
+-- 2021-03-23 Archange Malvoisin:	Added field DEPARTMENT which provides student purpose in the result set. 
 -- =============================================
 CREATE PROCEDURE [custom].[DFselACADEMICCurrent] @StudentPCID NVARCHAR(10)
 AS
@@ -29,6 +31,7 @@ BEGIN
 	SELECT A.ACADEMIC_YEAR
 		,A.ACADEMIC_TERM
 		,PROGRAM
+		,DEPARTMENT
 		,CP.SHORT_DESC [ProgramShort]
 		,CP.MEDIUM_DESC [ProgramMedium]
 		,CP.LONG_DESC [ProgramLong]
