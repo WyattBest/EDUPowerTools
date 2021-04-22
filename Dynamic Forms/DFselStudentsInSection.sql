@@ -1,19 +1,20 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[DFselStudents]    Script Date: 2021-04-19 16:12:06 ******/
+/****** Object:  StoredProcedure [custom].[DFselStudentsInSection]    Script Date: 2021-04-22 11:50:32 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
 
+
 -- =============================================
 -- Author:		Wyatt Best
 -- Create date: 2021-04-19
 -- Description:	Return students enrolled in a particular section.
 -- =============================================
-CREATE PROCEDURE [custom].DFselStudentsInSection @SectionId INT
+CREATE PROCEDURE [custom].[DFselStudentsInSection] @SectionId INT
 AS
 BEGIN
 	SET NOCOUNT ON;
@@ -25,6 +26,7 @@ BEGIN
 		,dbo.fnPeopleOrgName(TD.PEOPLE_CODE_ID, 'LN') [LastName]
 		,dbo.fnGetPrimaryEmail(TD.PEOPLE_CODE_ID) PrimaryEmail
 		,TD.PEOPLE_CODE_ID + ', ' + dbo.fnPeopleOrgName(TD.PEOPLE_CODE_ID, 'DN |LN') + ', ' + dbo.fnGetPrimaryEmail(TD.PEOPLE_CODE_ID) AS [SearchableDesc]
+		,*
 	FROM SECTIONS S
 	INNER JOIN TRANSCRIPTDETAIL TD
 		ON TD.ACADEMIC_YEAR = S.ACADEMIC_YEAR
@@ -39,6 +41,8 @@ BEGIN
 			AND A.ACADEMIC_TERM = TD.ACADEMIC_TERM
 			AND A.ACADEMIC_SESSION = TD.ACADEMIC_SESSION
 			AND A.TRANSCRIPT_SEQ = TD.TRANSCRIPT_SEQ
+			and PRIMARY_FLAG = 'Y'
+			AND A.[STATUS] IN ('A','G')
 			AND A.ENROLL_SEPARATION NOT IN (
 				SELECT CODE_VALUE_KEY
 				FROM CODE_ENROLLMENT
@@ -56,5 +60,4 @@ BEGIN
 			)
 END
 GO
-
 
