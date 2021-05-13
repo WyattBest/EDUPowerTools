@@ -25,6 +25,8 @@ GO
 -- Description:	Drops a Vista View from database and removes associated metadata from various tables.
 --				Accepts either the view DB name as input. @ConfirmDelProtectedView must be set to 1 in order to
 --				delete views with ID's > 9999.
+--
+-- 2021-05-13 Wyatt Best:		Added delete from ABT_TABLESECURITY
 -- =============================================
 CREATE PROCEDURE [custom].[spDelVistaView] @viewDbName NVARCHAR(30)
 	,@ConfirmDelProtectedView INT = 0
@@ -59,18 +61,26 @@ BEGIN
 	BEGIN TRY
 		BEGIN TRAN [Tran1]
 
-		--Log deletion
-		INSERT INTO [custom].[Log_VISTAVIEW_Deletion]
-		SELECT [VIEW_ID]
-			,[VIEW_NAME]
-			,[VIEW_DB_NAME]
-			,[DESCRIPTION]
-			,[SYNTAX_ALTERED]
-			,[IS_DISTINCT]
-			,GETDATE() AS [DateDeleted]
-			,DB_NAME() AS [Database]
-		FROM VISTAVIEW
-		WHERE VIEW_ID = @viewId;
+		--Log deletion if log table exists
+		IF EXISTS (
+				SELECT *
+				FROM dbo.sysobjects
+				WHERE id = object_id(N'[custom].[Log_VISTAVIEW_Deletion]')
+					AND OBJECTPROPERTY(id, N'IsTable') = 1
+				)
+		BEGIN
+			INSERT INTO [custom].[Log_VISTAVIEW_Deletion]
+			SELECT [VIEW_ID]
+				,[VIEW_NAME]
+				,[VIEW_DB_NAME]
+				,[DESCRIPTION]
+				,[SYNTAX_ALTERED]
+				,[IS_DISTINCT]
+				,GETDATE() AS [DateDeleted]
+				,DB_NAME() AS [Database]
+			FROM VISTAVIEW
+			WHERE VIEW_ID = @viewId;
+		END
 
 		DELETE
 		FROM dbo.VISTAVIEWSYNTAX
@@ -122,6 +132,11 @@ BEGIN
 
 		DELETE
 		FROM ABT_TABLES
+		WHERE TABLE_NAME = @viewDbName;
+
+		--Triggers ought to handle this, but sometimes orphaned rows have remained.
+		DELETE
+		FROM ABT_TABLESECURITY
 		WHERE TABLE_NAME = @viewDbName;
 
 		SET @sql = 'drop view ' + @viewDbName;
