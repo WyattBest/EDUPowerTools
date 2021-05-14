@@ -1,15 +1,14 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[DFinsAction]    Script Date: 2021-04-20 14:20:03 ******/
+/****** Object:  StoredProcedure [custom].[DFinsAction]    Script Date: 2021-05-14 10:48:05 ******/
 SET ANSI_NULLS OFF
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
 
-
-CREATE PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
+ALTER PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
 	,@action_name NVARCHAR(50) = NULL --Will default from Action Definition
 	,@people_code_id NVARCHAR(10)
 	,@request_date DATE = NULL
@@ -18,7 +17,7 @@ CREATE PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
 	,@term NVARCHAR(10) = NULL
 	,@usecurrterm BIT = NULL
 	,@session NVARCHAR(10) = NULL
-	,@sched_date DATE = NULL --Scheduled Date in the UI
+	,@sched_date DATE --Scheduled Date in the UI
 	,@sched_time TIME = NULL --Scheduled Time in the UI
 	,@start_time TIME = NULL --Not stored directly; used to calculate duration. Doesn't support >24 hours.
 	,@end_time TIME = NULL --Not stored directly; used to calculate duration. Doesn't support >24 hours.
@@ -33,6 +32,7 @@ CREATE PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
 	,@note NVARCHAR(max) = NULL
 	,@response NVARCHAR(6) = NULL
 	,@opid NVARCHAR(8) = 'DYNFORMS'
+	,@instructions NVARCHAR(max) = NULL
 AS
 /***********************************************************************
 Description:
@@ -41,8 +41,10 @@ Description:
 
 Created: 2020-07-09 by Wyatt Best
 
-2021-01-08 Wyatt Best:	Added a bunch more columns.
+2021-01-08 Wyatt Best:		Added a bunch more columns.
 2021-01-09 Adrian Smith:	Added ' OR @request_date IS NULL' and similar due to API errors from submissions on the morning of 2021-01-09.
+2021-05-14 Wyatt Best:		Added @instructions column.
+							Made @sched_date required so that some submissions will silently exit. For forms that create multiple actions and may have unused rows.
 
 Example usage:
 	EXEC [custom].DFinsAction @action_id = 'SYCVIDHS'
@@ -61,16 +63,19 @@ DECLARE @unique NVARCHAR(50)
 IF @action_name = ''
 	SET @action_name = NULL
 
-IF @request_date = '' OR @request_date IS NULL
+IF @request_date = ''
+	OR @request_date IS NULL
 	SET @request_date = GETDATE()
 
-IF @request_time = '' OR @request_time IS NULL
+IF @request_time = ''
+	OR @request_time IS NULL
 	SET @request_time = GETDATE()
 
-IF @sched_date = '' OR @sched_date IS NULL
-	SET @sched_date = GETDATE()
+IF @sched_date = ''
+	RETURN
 
-IF @sched_time = '' OR @sched_time IS NULL
+IF @sched_time = ''
+	OR @sched_time IS NULL
 	SET @sched_time = GETDATE()
 
 IF @rating = ''
@@ -90,12 +95,9 @@ IF @execution_date = ''
 
 IF @canceled = ''
 	SET @canceled = 'N'
-
-IF @canceled_reason = ''
-	SET @canceled_reason = NULL
-
-IF @note = ''
-	SET @note = NULL
+SET @canceled_reason = nullif(@canceled_reason, '')
+SET @note = nullif(@note, '')
+SET @instructions = nullif(@instructions, '')
 
 IF @opid = ''
 	SET @opid = 'DYNFORMS'
@@ -284,15 +286,9 @@ IF @completed = 'Y'
 	SET @completed_by = @people_code_id
 --Sanity check on execution date
 SET @execution_date = (
-		CASE 
-			WHEN @execution_date IS NOT NULL
-				AND @completed = 'N'
-				THEN NULL
-			WHEN @execution_date IS NULL
-				AND @completed = 'Y'
-				THEN @today
-			ELSE @execution_date
-			END
+		CASE WHEN @execution_date IS NOT NULL
+				AND @completed = 'N' THEN NULL WHEN @execution_date IS NULL
+				AND @completed = 'Y' THEN @today ELSE @execution_date END
 		)
 
 --Insert the scheduled action
@@ -340,6 +336,7 @@ INSERT INTO ACTIONSCHEDULE (
 	,SEQ_NUM
 	,DURATION
 	,DOCUMENT
+	,Instruction
 	)
 SELECT @action_id [ACTION_ID]
 	,substring(@people_code_id, 1, 1) [PEOPLE_ORG_CODE]
@@ -382,19 +379,8 @@ SELECT @action_id [ACTION_ID]
 	,@session [ACADEMIC_SESSION]
 	,0 [RULE_ID]
 	,0 [SEQ_NUM]
-	,'   ' + (
-		CASE 
-			WHEN DATEDIFF(hour, @start_time, @end_time) > 0
-				THEN RIGHT('  ' + CAST(FLOOR(DATEDIFF(MINUTE, @start_time, @end_time) / 60) AS NVARCHAR(10)), 2)
-			ELSE '  '
-			END
-		) + CASE 
-		WHEN DATEDIFF(MINUTE, @start_time, @end_time) > 0
-			THEN RIGHT('  ' + CAST(DATEDIFF(MINUTE, @start_time, @end_time) % 60 AS NVARCHAR(10)), 2)
-		ELSE '  '
-		END [Duration]
+	,'   ' + (CASE WHEN DATEDIFF(hour, @start_time, @end_time) > 0 THEN RIGHT('  ' + CAST(FLOOR(DATEDIFF(MINUTE, @start_time, @end_time) / 60) AS NVARCHAR(10)), 2) ELSE '  ' END) + CASE WHEN DATEDIFF(MINUTE, @start_time, @end_time) > 0 THEN RIGHT('  ' + CAST(DATEDIFF(MINUTE, @start_time, @end_time) % 60 AS NVARCHAR(10)), 2) ELSE '  ' END [Duration]
 	,NULL [DOCUMENT]
+	,@instructions [Instruction]
 FROM [ACTION] A
 WHERE ACTION_ID = @action_id
-GO
-
