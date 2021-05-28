@@ -1,14 +1,15 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[DFinsAction]    Script Date: 2021-05-14 10:48:05 ******/
+/****** Object:  StoredProcedure [custom].[DFinsAction]    Script Date: 2021-05-28 10:37:14 ******/
 SET ANSI_NULLS OFF
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
+
+CREATE PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
 	,@action_name NVARCHAR(50) = NULL --Will default from Action Definition
 	,@people_code_id NVARCHAR(10)
 	,@request_date DATE = NULL
@@ -45,6 +46,7 @@ Created: 2020-07-09 by Wyatt Best
 2021-01-09 Adrian Smith:	Added ' OR @request_date IS NULL' and similar due to API errors from submissions on the morning of 2021-01-09.
 2021-05-14 Wyatt Best:		Added @instructions column.
 							Made @sched_date required so that some submissions will silently exit. For forms that create multiple actions and may have unused rows.
+2021-05-28 Wyatt Best:		Fixed bug where COMPLETED was being inserted as blank instead of N. Caused Self-Service 9 not to display checklist items.
 
 Example usage:
 	EXEC [custom].DFinsAction @action_id = 'SYCVIDHS'
@@ -92,6 +94,9 @@ IF @response = ''
 
 IF @execution_date = ''
 	SET @execution_date = NULL
+
+IF @completed = ''
+	SET @completed = 'N'
 
 IF @canceled = ''
 	SET @canceled = 'N'
@@ -384,3 +389,5 @@ SELECT @action_id [ACTION_ID]
 	,@instructions [Instruction]
 FROM [ACTION] A
 WHERE ACTION_ID = @action_id
+GO
+
