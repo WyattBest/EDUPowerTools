@@ -1,7 +1,7 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2021-03-09 11:21:12 ******/
+/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2021-06-14 14:50:21 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -21,14 +21,16 @@ GO
 -- 2021-01-13 Wyatt Best:	Move 2021-01-18 and 2021-01-21 sections to async format.
 -- 2021-03-09 Wyatt Best:	Added year/term limitation on setting ROOM_ID = ZOOM.
 --							Updated for Summer 2021.
+-- 2021-05-21 Wyatt Best:	Removed exclusion for Pathways to Success.
+-- 2021-06-14 Wyatt Best:	Corrected problem with deleted 5/31 meetings causing on-site/online cadence to be off.
 -- =============================================
 ALTER PROCEDURE [custom].[spUpdateSectionMeetings] @AcademicYear NVARCHAR(4)
 	,@AcademicTerm NVARCHAR(10)
 AS
 BEGIN
 	SET NOCOUNT ON;
+	SET DATEFIRST 1
 
-	
 	--Safety check to make sure procedure has been updated for the term
 	IF (
 			@AcademicYear = '2021'
@@ -58,18 +60,9 @@ BEGIN
 			,SS.ROOM_ID
 			,CALENDARDET_EVENT_KEY
 			,CALENDAR_KEY
-			,1 [TargetPattern] --Example use: Difference Schools have classes on campus on odd/even weeks.
-			,RANK() OVER (
-				PARTITION BY C.EVENT_KEY ORDER BY CALENDAR_DATE
-				) [WeekNumber]
-			-- Test even/odd and then align it with the TargetPattern
-			,(
-				(
-					RANK() OVER (
-						PARTITION BY C.EVENT_KEY ORDER BY CALENDAR_DATE
-						) - 1
-					) % 2
-				) + 1 [WeekOddEven]
+			,0 [TargetPattern] --Example use: Difference Schools have classes on campus on odd/even weeks.
+			,DATEPART(WEEK, CALENDAR_DATE) [WeekNumber]
+			,DATEPART(WEEK, CALENDAR_DATE) % 2 [WeekOddEven] --Test even/odd; will be aligned with TargetPattern
 			,C.CALENDAR_DATE
 		INTO #SectionMeetings
 		FROM SECTIONS S
@@ -88,15 +81,17 @@ BEGIN
 			--AND S.SECTION NOT LIKE 'DST%'
 			AND SS.[DAY] <> 'DIST'
 			AND SS.ROOM_ID <> 'ZOOM'
-			AND (
-				S.NONTRAD_PROGRAM <> 'PTS' --Exclude Pathways to Success
-				OR S.NONTRAD_PROGRAM IS NULL
-				);
+			--AND (
+			--	S.NONTRAD_PROGRAM <> 'PTS' --Exclude Pathways to Success
+			--	OR S.NONTRAD_PROGRAM IS NULL
+			--	)
 
 		-- Debug
 		--SELECT *
 		--FROM #SectionMeetings SM
-		--ORDER BY CALENDAR_DATE
+		--ORDER BY EVENT_ID
+		--	,SECTION
+		--	,CALENDAR_DATE
 
 		--Delete holidays and extra Tuesday and Wednesday meetings
 		DELETE C
