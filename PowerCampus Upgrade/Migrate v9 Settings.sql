@@ -9,6 +9,8 @@ USE Campus6
 --
 --				Before upgrading from v8 to v9, you'll probably configure a v9 test env. During the prod upgrade, you will wish to
 --				copy settings from your v9 test DB, as your upgraded DB won't contain any of the new settings.
+--
+--				This script operates on the assumption that your test PowerCampusIdentity DB will become your prod PowerCampusIdentity DB by flushing and re-migrating users.
 -- =============================================
 --Set sheet background color
 EXEC spInsUpdAbtSettings 'SYSADMIN'
@@ -89,31 +91,6 @@ WHERE IsCustom = 1
 		WHERE SMO.LinkId = SMO2.LinkId
 		)
 
-/*
---Copy sitemap roles in PowerCampusIdentity
-USE POWERCAMPUSIDENTITy
-
-DECLARE @ApplicationId INT = (
-		SELECT Applicationid
-		FROM auth.[Application]
-		WHERE [Name] = '/PowerCAMPUS'
-		)
-
-INSERT INTO AUTH.APPROLE (
-	APPLICATIONID
-	,[Name]
-	)
-SELECT applicationid
-	,name
-FROM powercampusidentity.AUTH.APPROLE AR2
-WHERE applicationid = @applicationid
-	AND NOT EXISTS (
-		SELECT *
-		FROM AUTH.APPROLE AR
-		WHERE AR.applicationid = @applicationid
-			AND
-		)
-*/
 --Copy sitemap roles in Campus6
 INSERT INTO SiteMapRole (
 	RoleName
@@ -131,7 +108,6 @@ WHERE IsCustom = 1
 		WHERE SMO.RoleName = SMO2.RoleName
 		)
 
-BEGIN TRAN
 
 --Copy sitemap role options
 INSERT INTO SiteMapOptionRole (
@@ -140,17 +116,17 @@ INSERT INTO SiteMapOptionRole (
 	,IsVisible
 	)
 SELECT SMOR2.SiteMapOptionId
-	,SMOR.SiteMapRoleId
-	,SMOR.IsVisible
+	,SMR.SiteMapRoleId
+	,SMOR2.IsVisible
 FROM Campus6_912.dbo.SiteMapOptionRole SMOR2
-INNER JOIN SiteMapOption SMO
+INNER JOIN SiteMapOption SMO2
 	ON SMO2.SiteMapOptionId = SMOR2.SiteMapOptionId
 INNER JOIN SiteMapRole SMR2
 	ON SMR2.SiteMapRoleId = SMOR2.SiteMapRoleId
-LEFT JOIN SITEMAPOPTION SMO
-	ON SMO.LINKID = SMO2.LINKID
-LEFT JOIN SITEMAPROLE SMR
-	ON SMR.ROLENAME = SMR2.ROLENAME
+LEFT JOIN SiteMapOption SMO
+	ON SMO.LinkId = SMO2.LinkId
+LEFT JOIN SiteMapRole SMR
+	ON SMR.RoleName = SMR2.RoleName
 WHERE NOT EXISTS (
 		SELECT *
 		FROM SiteMapOptionRole SMOR
@@ -162,9 +138,44 @@ WHERE NOT EXISTS (
 			AND SMO.LinkId = SMO2.LinkId
 		)
 
-SELECT *
-FROM SiteMapOptionRole SMOR
-INNER JOIN SiteMapOption SMO
-	ON SMO.SiteMapOptionId = SMOR.SiteMapOptionId
-INNER JOIN SiteMapRole SMR
-	ON SMR.SiteMapRoleId = SMOR.SiteMapRoleId
+--Copy Theme and other instutition settings
+MERGE dbo.InstitutionSetting AS myTarget
+USING (
+	SELECT AreaName
+		,SectionName
+		,LabelName
+		,Setting
+		,PersonId
+	FROM campus6_912.dbo.InstitutionSetting
+	--Which settings to copy
+	WHERE areaname IN ('Theme')
+	) AS mySource
+	ON mySource.AreaName = myTarget.AreaName
+		AND mySource.SectionName = myTarget.SectionName
+		AND mySource.LabelName = myTarget.LabelName
+WHEN MATCHED
+	THEN
+		UPDATE
+		SET Setting = mySource.Setting
+			,RevisionDatetime = getdate()
+			,PersonId = mySource.PersonId
+WHEN NOT MATCHED
+	THEN
+		INSERT (
+			AreaName
+			,SectionName
+			,LabelName
+			,Setting
+			,CreateDatetime
+			,RevisionDatetime
+			,PersonId
+			)
+		VALUES (
+			AreaName
+			,SectionName
+			,LabelName
+			,Setting
+			,getdate()
+			,getdate()
+			,PersonId
+			);
