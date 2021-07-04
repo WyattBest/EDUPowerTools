@@ -1,62 +1,42 @@
-USE Campus6
-
+use [master]
 -- =============================================
 -- Compatible with Self-Service 9.1.4 and possible higher.
 --
 -- Author:		Wyatt Best
 -- Create date: 2021-07-02
 -- Description:	Intended to copy settings from v9.1.2 test DB to v9.1.4 production DB.
+--				Why? When upgrading from v8 to v9, institutions often want to copy settings from v9 test to v9 prod,
+--				as your newly-upgraded prod DB will not contain any values for the new settings.
+--				Copying directly saves a lot of clicking and time during the upgrade window.
 --
---				Before upgrading from v8 to v9, you'll probably configure a v9 test env. During the prod upgrade, you will wish to
---				copy settings from your v9 test DB, as your upgraded DB won't contain any of the new settings.
---
---				This script operates on the assumption that your test PowerCampusIdentity DB will become your prod PowerCampusIdentity DB by flushing and re-migrating users.
+--				You MUST update the database name vars and run in SQLCMD mode.
 -- =============================================
---Set sheet background color
-EXEC spInsUpdAbtSettings 'SYSADMIN'
-	,'BACKGROUND'
-	,'GRID_BACKGROUND_1'
-	,'12632256'
-	,0
-	,'WBEST'
-	,'SQL'
 
---Set sheet background color
-EXEC spInsUpdAbtSettings 'SYSADMIN'
-	,'BACKGROUND'
-	,'GRID_BACKGROUND_2'
-	,'13429452'
-	,0
-	,'WBEST'
-	,'SQL'
+:setvar pc_db_new "Campus6"
+:setvar pc_db_old "Campus6_912"
+:setvar identity_db_new "PowerCampusIdentity"
+:setvar identity_db_old "PowerCampusIdentity_912"
 
---Enable integrated security
-EXEC spInsUpdAbtSettings 'SYSADMIN'
-	,'LOGON'
-	,'SECURITY_MODE'
-	,'Integrated'
-	,0
-	,'WBEST'
-	,'SQL'
+USE $(pc_db_new)
 
---Copy domain name code value from test
-IF NOT EXISTS (
+--Copy custom sitemap roles
+INSERT INTO SiteMapRole (
+	RoleName
+	,SortOrder
+	,IsCustom
+	)
+SELECT RoleName
+	,SortOrder
+	,IsCustom
+FROM $(pc_db_old).dbo.SiteMapRole SMO2
+WHERE IsCustom = 1
+	AND NOT EXISTS (
 		SELECT *
-		FROM CODE_DOMAIN
+		FROM SiteMapRole SMO
+		WHERE SMO.RoleName = SMO2.RoleName
 		)
-	INSERT INTO CODE_DOMAIN
-	SELECT *
-	FROM Campus6_912.dbo.CODE_DOMAIN
 
---Set domain name on all operator profiles
-UPDATE ABT_USERS
-SET DOMAIN = (
-		SELECT TOP 1 CODE_VALUE_KEY
-		FROM CODE_DOMAIN
-		)
-WHERE DOMAIN IS NULL
-
---Copy sitemap external links
+--Copy custom sitemap options
 INSERT INTO SiteMapOption (
 	LinkId
 	,ExternalLink
@@ -65,7 +45,7 @@ INSERT INTO SiteMapOption (
 SELECT LinkId
 	,ExternalLink
 	,IsCustom
-FROM Campus6_912.dbo.SiteMapOption SMO2
+FROM $(pc_db_old).dbo.SiteMapOption SMO2
 WHERE IsCustom = 1
 	AND NOT EXISTS (
 		SELECT *
@@ -83,31 +63,13 @@ SELECT SiteMapOptionId
 	,LinkId
 	,ExternalLink
 	,IsCustom
-FROM Campus6_912.dbo.SiteMapOptionDetail SMO2
+FROM $(pc_db_old).dbo.SiteMapOptionDetail SMO2
 WHERE IsCustom = 1
 	AND NOT EXISTS (
 		SELECT *
 		FROM SiteMapOptionDetail SMO
 		WHERE SMO.LinkId = SMO2.LinkId
 		)
-
---Copy sitemap roles in Campus6
-INSERT INTO SiteMapRole (
-	RoleName
-	,SortOrder
-	,IsCustom
-	)
-SELECT RoleName
-	,SortOrder
-	,IsCustom
-FROM Campus6_912.dbo.SiteMapRole SMO2
-WHERE IsCustom = 1
-	AND NOT EXISTS (
-		SELECT *
-		FROM SiteMapRole SMO
-		WHERE SMO.RoleName = SMO2.RoleName
-		)
-
 
 --Copy sitemap role options
 INSERT INTO SiteMapOptionRole (
@@ -118,7 +80,7 @@ INSERT INTO SiteMapOptionRole (
 SELECT SMOR2.SiteMapOptionId
 	,SMR.SiteMapRoleId
 	,SMOR2.IsVisible
-FROM Campus6_912.dbo.SiteMapOptionRole SMOR2
+FROM $(pc_db_old).dbo.SiteMapOptionRole SMOR2
 INNER JOIN SiteMapOption SMO2
 	ON SMO2.SiteMapOptionId = SMOR2.SiteMapOptionId
 INNER JOIN SiteMapRole SMR2
@@ -146,7 +108,7 @@ USING (
 		,LabelName
 		,Setting
 		,PersonId
-	FROM campus6_912.dbo.InstitutionSetting
+	FROM $(pc_db_old).dbo.InstitutionSetting
 	--Which settings to copy
 	WHERE areaname IN ('Theme')
 	) AS mySource
@@ -179,3 +141,55 @@ WHEN NOT MATCHED
 			,getdate()
 			,PersonId
 			);
+
+--Copy Roles and Claims in PowerCampus Identity database
+USE [$(identity_db_new)]
+
+DECLARE @ApplicationId INT = (
+		SELECT Applicationid
+		FROM auth.appcatalog
+		WHERE [Name] = 'SelfService'
+		)
+
+INSERT INTO auth.AppRole (
+	ApplicationId
+	,[Name]
+	)
+SELECT @ApplicationId
+	,AR2.[Name]
+FROM [$(identity_db_old)].auth.AppRole AR2
+INNER JOIN [$(identity_db_old)].auth.AppCatalog AC2
+	ON AC2.ApplicationId = AR2.ApplicationId
+		AND AC2.[Name] = 'SelfService'
+WHERE NOT EXISTS (
+		SELECT *
+		FROM auth.AppRole AR
+		WHERE AR.ApplicationId = @ApplicationId
+			AND AR.[Name] = AR2.[Name]
+		)
+
+INSERT INTO auth.AppRoleClaim (
+	AppRoleId
+	,AppClaimId
+	)
+SELECT AR.AppRoleId
+	,AC.AppClaimId
+FROM [$(identity_db_old)].auth.AppRoleClaim ARC2
+INNER JOIN [$(identity_db_old)].auth.AppRole AR2
+	ON AR2.AppRoleId = ARC2.AppRoleId
+INNER JOIN [$(identity_db_old)].auth.AppClaim AC2
+	ON AC2.AppClaimId = ARC2.AppClaimId
+LEFT JOIN auth.AppRole AR
+	ON AR.[Name] = AR2.[Name]
+LEFT JOIN auth.AppClaim AC
+	ON AC.[Name] = AC2.[Name]
+WHERE NOT EXISTS (
+		SELECT *
+		FROM auth.AppRoleClaim ARC
+		INNER JOIN auth.AppClaim AC
+			ON AC.AppClaimId = ARC.AppClaimId
+		INNER JOIN auth.AppRole AR
+			ON AR.AppRoleId = ARC.AppRoleId
+		WHERE AR.[Name] = AR2.[Name]
+			AND AC.[Name] = AC2.[Name]
+		)
