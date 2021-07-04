@@ -10,6 +10,7 @@ use [master]
 --				Copying directly saves a lot of clicking and time during the upgrade window.
 --
 --				You MUST update the database name vars and run in SQLCMD mode.
+--				Run MigrateMembershipDatabase.bat, log into User Management, and set Application BEFORE running this script.
 -- =============================================
 
 :setvar pc_db_new "Campus6"
