@@ -1,13 +1,10 @@
 USE [Campus6]
 GO
-
-/****** Object:  StoredProcedure [custom].[DFinsAction]    Script Date: 2021-05-28 10:37:14 ******/
+/****** Object:  StoredProcedure [custom].[DFinsAction]    Script Date: 2021-07-09 12:20:48 ******/
 SET ANSI_NULLS OFF
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
-
 
 CREATE PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
 	,@action_name NVARCHAR(50) = NULL --Will default from Action Definition
@@ -47,6 +44,7 @@ Created: 2020-07-09 by Wyatt Best
 2021-05-14 Wyatt Best:		Added @instructions column.
 							Made @sched_date required so that some submissions will silently exit. For forms that create multiple actions and may have unused rows.
 2021-05-28 Wyatt Best:		Fixed bug where COMPLETED was being inserted as blank instead of N. Caused Self-Service 9 not to display checklist items.
+2021-07-09 Wyatt Best:		Include erroring value in some custom error messages.
 
 Example usage:
 	EXEC [custom].DFinsAction @action_id = 'SYCVIDHS'
@@ -126,9 +124,10 @@ IF (
 		)
 BEGIN
 	RAISERROR (
-			'@action_id not found in ACTION.'
+			'@action_id ''%s'' not found in ACTION.'
 			,11
 			,1
+			,@action_id
 			)
 
 	RETURN
@@ -144,9 +143,10 @@ IF (
 		)
 BEGIN
 	RAISERROR (
-			'@people_code_id not found in PEOPLE.'
+			'@people_code_id ''%s'' not found in PEOPLE.'
 			,11
 			,1
+			,@people_code_id
 			)
 
 	RETURN
@@ -163,27 +163,10 @@ IF (
 		)
 BEGIN
 	RAISERROR (
-			'@resp_staff not found in PEOPLE.'
+			'@resp_staff ''%s'' not found in PEOPLE.'
 			,11
 			,1
-			)
-
-	RETURN
-END
-
---Verify @people_code_id is real
-IF (
-		NOT EXISTS (
-			SELECT *
-			FROM PEOPLE
-			WHERE PEOPLE_CODE_ID = @people_code_id
-			)
-		)
-BEGIN
-	RAISERROR (
-			'@people_code_id not found in PEOPLE.'
-			,11
-			,1
+			,@resp_staff
 			)
 
 	RETURN
@@ -200,9 +183,10 @@ IF (
 		)
 BEGIN
 	RAISERROR (
-			'@completed_by not found in PEOPLE.'
+			'@completed_by ''%s'' not found in PEOPLE.'
 			,11
 			,1
+			,@completed_by
 			)
 
 	RETURN
@@ -389,5 +373,3 @@ SELECT @action_id [ACTION_ID]
 	,@instructions [Instruction]
 FROM [ACTION] A
 WHERE ACTION_ID = @action_id
-GO
-
