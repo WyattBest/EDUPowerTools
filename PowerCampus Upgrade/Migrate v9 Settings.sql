@@ -4,7 +4,7 @@ use [master]
 --
 -- Author:		Wyatt Best
 -- Create date: 2021-07-02
--- Description:	Intended to copy settings from v9.1.2 test DB to v9.1.4 production DB.
+-- Description:	Intended to copy settings from v9.1.4 test DB to v9.1.4 production DB.
 --				Why? When upgrading from v8 to v9, institutions often want to copy settings from v9 test to v9 prod,
 --				as your newly-upgraded prod DB will not contain any values for the new settings.
 --				Copying directly saves a lot of clicking and time during the upgrade window.
@@ -12,11 +12,25 @@ use [master]
 --				You MUST update the database name vars and run in SQLCMD mode.
 --				Run MigrateMembershipDatabase.bat, log into User Management, and set Application BEFORE running this script.
 -- =============================================
-
 :setvar pc_db_new "Campus6"
-:setvar pc_db_old "Campus6_912"
+:setvar pc_db_old "Campus9_test"
 :setvar identity_db_new "PowerCampusIdentity"
-:setvar identity_db_old "PowerCampusIdentity_912"
+:setvar identity_db_old "PowerCampusIdentity_test"
+
+--Database version check
+USE $(identity_db_old)
+IF (
+		SELECT isnull(objectproperty(object_id(N'auth.AppRole'), 'IsTable'), 0)
+		) = 0
+BEGIN
+	RAISERROR (
+			'Old PowerCampusIdentity database must be at version 9.1.4 or higher. Please run Ellucian''s upgrade script before using this tool.'
+			,11
+			,1
+			)
+
+	RETURN
+END
 
 USE $(pc_db_new)
 
