@@ -17,8 +17,10 @@ use [master]
 :setvar identity_db_new "PowerCampusIdentity"
 :setvar identity_db_old "PowerCampusIdentity_test"
 
+SET NOCOUNT ON
+
 --Database version check
-USE $(identity_db_old)
+USE [$(identity_db_old)]
 IF (
 		SELECT isnull(objectproperty(object_id(N'auth.AppRole'), 'IsTable'), 0)
 		) = 0
@@ -32,7 +34,9 @@ BEGIN
 	RETURN
 END
 
-USE $(pc_db_new)
+USE [$(pc_db_new)]
+PRINT 'Using database $(pc_db_new)'
+PRINT ''
 
 --Copy custom sitemap roles
 INSERT INTO SiteMapRole (
@@ -50,6 +54,7 @@ WHERE IsCustom = 1
 		FROM SiteMapRole SMO
 		WHERE SMO.RoleName = SMO2.RoleName
 		)
+PRINT cast(@@rowcount as varchar(10)) + ' SiteMapRole rows affected.'
 
 --Copy custom sitemap options
 INSERT INTO SiteMapOption (
@@ -67,6 +72,7 @@ WHERE IsCustom = 1
 		FROM SiteMapOption SMO
 		WHERE smo.LinkId = SMO2.LinkId
 		)
+PRINT cast(@@rowcount as varchar(10)) + ' SiteMapOption rows affected.'
 
 INSERT INTO SiteMapOptionDetail (
 	SiteMapOptionId
@@ -85,6 +91,7 @@ WHERE IsCustom = 1
 		FROM SiteMapOptionDetail SMO
 		WHERE SMO.LinkId = SMO2.LinkId
 		)
+PRINT cast(@@rowcount as varchar(10)) + ' SiteMapOptionDetail rows affected.'
 
 --Copy sitemap role options
 INSERT INTO SiteMapOptionRole (
@@ -114,6 +121,7 @@ WHERE NOT EXISTS (
 		WHERE SMR.RoleName = SMR2.RoleName
 			AND SMO.LinkId = SMO2.LinkId
 		)
+PRINT cast(@@rowcount as varchar(10)) + ' SiteMapOptionRole rows affected.'
 
 --Copy Theme and other instutition settings
 MERGE dbo.InstitutionSetting AS myTarget
@@ -156,9 +164,13 @@ WHEN NOT MATCHED
 			,getdate()
 			,PersonId
 			);
+PRINT cast(@@rowcount as varchar(10)) + ' InstitutionSetting rows affected.'
 
 --Copy Roles and Claims in PowerCampus Identity database
 USE [$(identity_db_new)]
+PRINT ''
+PRINT 'Using database $(identity_db_new)'
+PRINT ''
 
 DECLARE @ApplicationId INT = (
 		SELECT Applicationid
@@ -182,6 +194,7 @@ WHERE NOT EXISTS (
 		WHERE AR.ApplicationId = @ApplicationId
 			AND AR.[Name] = AR2.[Name]
 		)
+PRINT cast(@@rowcount as varchar(10)) + ' auth.AppRole rows affected.'
 
 INSERT INTO auth.AppRoleClaim (
 	AppRoleId
@@ -208,3 +221,5 @@ WHERE NOT EXISTS (
 		WHERE AR.[Name] = AR2.[Name]
 			AND AC.[Name] = AC2.[Name]
 		)
+PRINT cast(@@rowcount as varchar(10)) + ' auth.AppRoleClaim rows affected.'
+
