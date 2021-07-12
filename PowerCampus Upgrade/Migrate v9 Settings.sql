@@ -123,6 +123,37 @@ WHERE NOT EXISTS (
 		)
 PRINT cast(@@rowcount as varchar(10)) + ' SiteMapOptionRole rows affected.'
 
+
+--Copy sitemap detail role options
+INSERT INTO SiteMapOptionDetailRole (
+	SiteMapOptionDetailId
+	,SiteMapRoleId
+	,IsVisible
+	)
+SELECT SMODR2.SiteMapOptionDetailId
+	,SMR.SiteMapRoleId
+	,SMODR2.IsVisible
+FROM $(pc_db_old).dbo.SiteMapOptionDetailRole SMODR2
+INNER JOIN SiteMapOptionDetail SMOD2
+	ON SMOD2.SiteMapOptionDetailId = SMODR2.SiteMapOptionDetailId
+INNER JOIN SiteMapRole SMR2
+	ON SMR2.SiteMapRoleId = SMODR2.SiteMapRoleId
+LEFT JOIN SiteMapOptionDetail SMOD
+	ON SMOD.LinkId = SMOD2.LinkId
+LEFT JOIN SiteMapRole SMR
+	ON SMR.RoleName = SMR2.RoleName
+WHERE NOT EXISTS (
+		SELECT *
+		FROM SiteMapOptionDetailRole SMODR
+		INNER JOIN SiteMapOptionDetail SMOD
+			ON SMOD.SiteMapOptionDetailId = SMODR.SiteMapOptionDetailId
+		INNER JOIN SiteMapRole SMR
+			ON SMR.SiteMapRoleId = SMODR.SiteMapRoleId
+		WHERE SMR.RoleName = SMR2.RoleName
+			AND SMOD.LinkId = SMOD2.LinkId
+		)
+PRINT cast(@@rowcount as varchar(10)) + ' SiteMapOptionDetailRole rows affected.'
+
 --Copy Theme and other instutition settings
 MERGE dbo.InstitutionSetting AS myTarget
 USING (
