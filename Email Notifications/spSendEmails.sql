@@ -1,3 +1,6 @@
+USE [Campus6]
+GO
+/****** Object:  StoredProcedure [custom].[spSendEmails]    Script Date: 2021-07-30 15:59:22 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -25,6 +28,7 @@ GO
 -- 2020-01-31 Wyatt Best:	Added missing step to supply [from] from [fromId].
 -- 2020-02-11 Wyatt Best:	Moved step to supply [from] from [fromId] to #MessagesIntermediate to solve issue where compiler falsly believes the column doesn't exist.
 --							Added error check for at least one sender column.
+-- 2020-09-04 Wyatt Best:	New styling for better rendering on mobile devices. Moved logo image to https://static.mcny.edu/images/MCNY_logo_cp.gif
 --
 -- TODO:
 --		Replace XACT_ABORT with TRY/CATCH.
@@ -36,7 +40,7 @@ GO
 --		  Columns marked with 'O' are optional columns that do not need to exist.
 /*
 	CREATE TABLE #Messages (
-		[from] NVARCHAR(255) NOT NULL			--an email address
+		[from] NVARCHAR(255) NULL				--an email address
 O		,[fromId] NVARCHAR(10) NULL				--sender People Code Id
 O		,[to] NVARCHAR(255) NULL				--an email address. If NULL, will be automatically supplied from toId.
 O		,[toId] NVARCHAR(10) NULL				--recipient People Code Id. If NULL, [to] must exist.
@@ -306,9 +310,9 @@ BEGIN
 				VALUES (
 					''
 					,M.[subject]
-					,'<table class=''wrapper'' style=''border-spacing:0;width:100%;background-color:#f1f2f6;table-layout:fixed;''><tr><td align=''center'' class=''text-logo'' style=''padding-right:0;padding-left:0;vertical-align:top;padding-top:24px;padding-bottom:0;font-family:sans-serif;font-size:14px;color:#bec7cf;''><center><div class=''spacer body-buffer'' style=''font-size:20px;line-height:10px;display:block;''>&nbsp;</div><table class=''gmail hide'' style=''border-spacing:0;width:650px;min-width:650px;''><tr><td style=''padding-top:0;padding-bottom:0;padding-right:0;padding-left:0;vertical-align:top;font-size:1px;line-height:1px;''></td></tr></table><img src=''https://legacy.mcny.edu/App_Themes/Default/Images/MCNY_logo_cp.gif'' alt=''Metropolitan College of New York'' style=''border-width:0;-ms-interpolation-mode:bicubic;''></center></td></tr></table><table class=''wrapper'' style=''border-spacing:0;width:100%;background-color:#f1f2f6;table-layout:fixed;''><tr><td class=''main-content'' align=''center'' style=''padding-top:0;padding-bottom:0;padding-right:0;padding-left:0;vertical-align:top;''><div class=''spacer hide'' style=''font-size:10px;line-height:20px;height:20px;display:block;''>&nbsp;</div><center><table class=''table-top'' width=''610'' style=''border-spacing:0;Margin:0 auto;''><tr><td width=''100%'' style=''padding-top:0;padding-bottom:0;padding-right:0;padding-left:0;vertical-align:top;''></td></tr></table><!--[if gte mso 9]><table width=''610'' style=''border-spacing:0;''><tr><td style=''border-bottom-width:1px;border-bottom-style:solid;border-bottom-color:#e2e3e7;padding-top:0;padding-bottom:0;padding-right:0;padding-left:0;vertical-align:top;''>&nbsp;</td></tr></table><![endif]--><table class=''standard-white viewport'' width=''612'' style=''border-spacing:0;Margin:0 auto;''><tr><td class=''viewport'' width=''608'' bgcolor=''#ffffff'' style=''padding-top:0;padding-bottom:0;padding-right:0;padding-left:0;vertical-align:top;Margin:0 auto;''><table class=''public-canvas-top'' width=''100%'' style=''border-spacing:0;''><tr><td class=''pad-top pad-sides pad-bottom'' style=''vertical-align:top;padding-top:60px;padding-bottom:70px;padding-left:70px;padding-right:70px;''><table class=''download'' width=''100%'' style=''border-spacing:0;''><tr><td class=''copy'' style=''padding-top:0;padding-right:0;padding-left:0;vertical-align:top;padding-bottom:7px;text-align:left;''>'
+					,'<table class="wrapper" style="border-spacing:0;width:100%;background-color:#fff;table-layout:fixed;"> <tr> <td align="center" class="text-logo" style="padding-right:0;padding-left:0;vertical-align:top;padding-top:24px;padding-bottom:0;font-family:sans-serif;font-size:14px;color:#bec7cf;"> <center> <div class="spacer body-buffer" style="font-size:20px;line-height:10px;display:block;">&nbsp;</div><img src="https://static.mcny.edu/images/MCNY_logo_cp.gif" alt="Metropolitan College of New York" style="border-width:0;-ms-interpolation-mode:bicubic;"> </center> </td></tr></table> <table class="wrapper" style="border-spacing:0;width:100%;background-color:#fff;table-layout:fixed;"> <tr> <td class="main-content" align="center" style="padding-top:0;padding-bottom:0;padding-right:0;padding-left:0;vertical-align:top;"> <div class="spacer hide" style="font-size:10px;line-height:20px;height:20px;display:block;">&nbsp;</div><center> <table class="table-top" width="610" style="border-spacing:0;Margin:0 auto;"> <tr> <td width="100%" style="padding-top:0;padding-bottom:0;padding-right:0;padding-left:0;vertical-align:top;"> </td></tr></table> <table class="standard-white viewport" width="650" style="border-spacing:0;Margin:0 auto;"> <tr> <td class="viewport" width="650" bgcolor="#ffffff" style="padding-top:0;padding-bottom:0;padding-right:0;padding-left:0;vertical-align:top;Margin:0 auto;"> <table class="public-canvas-top" width="100%" style="border-spacing:0;"> <tr> <td class="pad-top pad-sides pad-bottom" style="vertical-align:top;padding-top:60px;padding-bottom:70px;padding-left:70px;padding-right:70px;"> <table class="download" width="100%" style="border-spacing:0;"> <tr> <td class="copy" style="padding-top:0;padding-right:0;padding-left:0;vertical-align:top;padding-bottom:7px;text-align:left;">'
 						+ M.[body] +
-						'</td></tr></table></td></tr></table></td></tr></table></center><center><div class=''spacer body-buffer'' style=''font-size:20px;line-height:30px;display:block;''>&nbsp;</div><p style=''Margin-top:0;font-weight:normal;color:#677483;font-family:sans-serif;font-size:14px;line-height:25px;Margin-bottom:15px;''>Metropolitan College of New York &middot; 60 West St &middot; New York, NY &middot; 10006 &middot; 212.343.1234</p><div class=''spacer body-buffer'' style=''font-size:20px;line-height:10px;display:block;''>&nbsp;</div></center></td></tr></table>'
+						'</td></tr></table> </td></tr></table> </td></tr></table> </center> <center> <div class="spacer body-buffer" style="font-size:20px;line-height:30px;display:block;">&nbsp;</div><p style="Margin-top:0;font-weight:normal;color:#677483;font-family:sans-serif;font-size:14px;line-height:25px;Margin-bottom:15px;"> Metropolitan College of New York · 60 West St · New York, NY · 10006 · 212.343.1234</p><div class="spacer body-buffer" style="font-size:20px;line-height:10px;display:block;">&nbsp;</div></center> </td></tr></table>'
 					,1
 					,NULL
 					,M.[from]
@@ -451,5 +455,3 @@ BEGIN
 	DROP TABLE #MessagesIntermediate;
 
 END
-GO
-
