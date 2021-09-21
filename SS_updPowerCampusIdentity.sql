@@ -1,10 +1,13 @@
 USE [Campus6]
 GO
-/****** Object:  StoredProcedure [custom].[SS_updPowerCampusIdentity]    Script Date: 2020-06-18 15:03:20 ******/
+
+/****** Object:  StoredProcedure [custom].[SS_updPowerCampusIdentity]    Script Date: 2021-09-21 10:17:09 ******/
 SET ANSI_NULLS ON
 GO
+
 SET QUOTED_IDENTIFIER ON
 GO
+
 -- =============================================
 -- Author:		Wyatt Best
 -- Create date: 2019-10-25
@@ -22,9 +25,9 @@ GO
 -- 2019-11-08 Wyatt Best:	Added functionality to also sync auth.IdentityUser table and renamed from custom.SS_updIdentityRoles to custom.SS_updPowerCampusIdentity
 -- 2019-11-22 Wyatt Best:	Added DISTINCT in final merge statement to cover cases when Dossier rights are added from two different sources.
 -- 2019-12-19 Wyatt Best:	Added IdentityUserStoreId column for new user insert; this is new in 9.0.2
+-- 2021-09-21 Wyatt Best:	Updated for 9.1.4. PowerCampusIdentity table names changed and many keys were changed to INT instead of UNIQUEIDENTIFIER.
 -- =============================================
-
-CREATE PROCEDURE [custom].[SS_updPowerCampusIdentity]
+ALTER PROCEDURE [custom].[SS_updPowerCampusIdentity]
 AS
 BEGIN
 	SET NOCOUNT ON;
@@ -32,35 +35,49 @@ BEGIN
 	--=============================================================
 	--Preliminary mappings from PowerCampus to PowerCampusIdentity
 	--=============================================================
-	DECLARE @ApplicationId UNIQUEIDENTIFIER = (
+	DECLARE @ApplicationId INT = (
 			SELECT ApplicationId
-			FROM [PowerCampusIdentity].[auth].[IdentityApplication]
-			WHERE ApplicationName = '/PowerCAMPUS'
+			FROM [PowerCampusIdentity].[auth].[Application]
+			WHERE [Name] = '/PowerCAMPUS'
 			)
-	DECLARE @DossierRole UNIQUEIDENTIFIER = (
-			SELECT RoleId
-			FROM [PowerCampusIdentity].[auth].[IdentityRole]
-			WHERE RoleName = 'MCNYDossier'
+	DECLARE @DossierRole INT = (
+			SELECT AppRoleId
+			FROM [PowerCampusIdentity].[auth].[AppRole]
+			WHERE [Name] = 'MCNYDossier'
+				AND ApplicationId = @ApplicationId
 			)
-	DECLARE @RegChangeRole UNIQUEIDENTIFIER = (
-			SELECT RoleId
-			FROM [PowerCampusIdentity].[auth].[IdentityRole]
-			WHERE RoleName = 'Registrar Change Approval'
+	DECLARE @RegChangeRole INT = (
+			SELECT AppRoleId
+			FROM [PowerCampusIdentity].[auth].[APPROLE]
+			WHERE [Name] = 'Registrar Change Approval'
+				AND ApplicationId = @ApplicationId
 			)
-	DECLARE @IdentityUserStoreId INT = 3 --New users will be created with this UserStore from [auth].[IdentityUserStore]
-
+	DECLARE @CreationAppStoreId INT = (
+			SELECT AppStoreId
+			FROM [PowerCampusIdentity].[auth].[AppStore]
+			WHERE ApplicationId = @ApplicationId
+				AND [Mode] = 2 --Active Directory
+				
+			)
+	DECLARE @AuthenticationAppStoreId INT = (
+			SELECT AppStoreId
+			FROM [PowerCampusIdentity].[auth].[AppStore]
+			WHERE ApplicationId = @ApplicationId
+				AND [Mode] = 3 --ADFS
+			)
 
 	--Map record types to PowerCampusIdentity roles according to SiteMapRole
-	SELECT RoleId
+	SELECT AppRoleId
 		,CODE_VALUE_KEY [RECORDTYPE]
+		--,SMR.RoleName						--Debug
 	INTO #IdentityRoles
 	FROM SiteMapRole SMR
 	INNER JOIN PersonTypeRole PTR
 		ON PTR.RoleName = SMR.RoleName
 	INNER JOIN CODE_RECORDTYPE CRT
 		ON CRT.RecordTypeId = PTR.PersonTypeId
-	INNER JOIN [PowerCampusIdentity].[auth].[IdentityRole] aIR
-		ON aIR.RoleName = SMR.RoleName
+	INNER JOIN [PowerCampusIdentity].[auth].[AppRole] aAR
+		ON aAR.[Name] = SMR.RoleName
 	WHERE ApplicationId = @ApplicationId
 
 	--=============================================================
@@ -69,8 +86,8 @@ BEGIN
 	
 	CREATE TABLE #UsersInRoles (
 		UserName NVARCHAR(50) NULL
-		,UserId UNIQUEIDENTIFIER
-		,RoleId UNIQUEIDENTIFIER
+		,AppUserId INT
+		,AppRoleId INT
 		);
 	
 	--Match PowerCampus users to Self-Service users based on username
@@ -78,13 +95,13 @@ BEGIN
 	INSERT INTO #UsersInRoles
 	SELECT
 		PU.UserName
-		,aIU.UserId
-		,IR.RoleId
-		--PU.PersonId						--Debug
+		,aAU.AppUserId
+		,IR.AppRoleId
+		--,PU.PersonId						--Debug
 		--,P.PEOPLE_CODE_ID					--Debug
 		--,PT.PEOPLE_TYPE [PT.PEOPLE_TYPE]	--Debug
-		--,IR.RECORDTYPE [IR.RECORDTYPE]	--Debug
-		--,IR.RoleName [IR.RoleName],		--Debug
+		--,IR.RECORDTYPE [IR.RECORDTYPE]		--Debug
+		--,IR.RoleName [IR.RoleName]			--Debug
 	FROM PersonUser PU
 	INNER JOIN PEOPLE P
 		ON P.PersonId = PU.PersonId
@@ -95,17 +112,17 @@ BEGIN
 			AND CRT.[STATUS] = 'A'
 	INNER JOIN #IdentityRoles IR
 		ON IR.RECORDTYPE = PT.PEOPLE_TYPE
-	LEFT JOIN [PowerCampusIdentity].[auth].[IdentityUser] aIU
-		ON aIU.UserName = PU.UserName
+	LEFT JOIN [PowerCampusIdentity].[auth].[AppUser] aAU
+		ON aAU.UserName = PU.UserName
 
 	--Add in dossier role for operators based on SS_D_Permissions
 	INSERT INTO #UsersInRoles
 	SELECT DISTINCT PU.UserName
-		,UserId
+		,aAU.AppUserId
 		,@DossierRole
 	FROM ABT_USERPROFILE AUP
-	INNER JOIN [Campus6_suppMCNY].[dbo].[SS_D_Permissions] DPerm
-		ON DPerm.PROFILE_CODE = AUP.PROFILE_CODE
+	--INNER JOIN [Campus6_suppMCNY].[dbo].[SS_D_Permissions] DPerm
+	--	ON DPerm.PROFILE_CODE = AUP.PROFILE_CODE
 	INNER JOIN ABT_USERS AU
 		ON AUP.OPERATOR_ID = AU.OPERATOR_ID
 			AND AU.[STATUS] = 'A'
@@ -113,13 +130,13 @@ BEGIN
 		ON AU.PEOPLE_CODE_ID = P.PEOPLE_CODE_ID
 	INNER JOIN PersonUser PU
 		ON P.PersonId = PU.PersonId
-	LEFT JOIN [PowerCampusIdentity].[auth].[IdentityUser] aIU
-		ON aIU.UserName = PU.UserName
+	LEFT JOIN [PowerCampusIdentity].[auth].[AppUser] aAU
+		ON aAU.UserName = PU.UserName
 	
 	--Add in Registrar Change Approval role based on operator profiles
 	INSERT INTO #UsersInRoles
-	SELECT DISTINCT  PU.UserName
-		,UserId
+	SELECT DISTINCT PU.UserName
+		,aAU.AppUserId
 		,@RegChangeRole
 	FROM ABT_USERPROFILE AUP
 	INNER JOIN ABT_USERS AU
@@ -129,95 +146,104 @@ BEGIN
 		ON AU.PEOPLE_CODE_ID = P.PEOPLE_CODE_ID
 	INNER JOIN PersonUser PU
 		ON P.PersonId = PU.PersonId
-	LEFT JOIN [PowerCampusIdentity].[auth].[IdentityUser] aIU
-		ON aIU.UserName = PU.UserName
+	LEFT JOIN [PowerCampusIdentity].[auth].[AppUser] aAU
+		ON aAU.UserName = PU.UserName
 	WHERE AUP.PROFILE_CODE IN ('REGSTAFF', 'REGISTRAR')
 
 	--Add back in non-federated users, such as SiteAdministrator
 	INSERT INTO #UsersInRoles (
-		UserId
-		,RoleId
+		AppUserId
+		,AppRoleId
 		)
-	SELECT aIUR.UserId
-		,aIUR.RoleId
-	FROM [PowerCampusIdentity].[auth].[IdentityUser] aIU
-	INNER JOIN [PowerCampusIdentity].[auth].[IdentityUserRole] aIUR
-		ON aIU.UserId = aIUR.UserId
-	WHERE aIU.[Password] <> ''
+	SELECT aAUR.AppRoleId
+		,aAUR.AppRoleId
+	FROM [PowerCampusIdentity].[auth].[AppUser] aAU
+	INNER JOIN [PowerCampusIdentity].[auth].[AppUserRole] aAUR
+		ON aAU.AppUserId = aAUR.AppUserId
+	WHERE aAU.[Password] <> ''
 
 	--=============================================================
 	--Insert/delete users from PowerCampusIdentity
 	--=============================================================
 	
 	--Debug: select the users we will delete
-	--SELECT 'DELETE' [Action]
-	--	,aIU.UserName
-	--	,UserId
-	--FROM [PowerCampusIdentity].[auth].[IdentityUser] aIU
-	--LEFT JOIN PersonUser PU
-	--	ON PU.UserName = aIU.UserName
-	--WHERE PU.UserName IS NULL
-	--	AND [Password] = '' --Only federated users
-
-	--Delete users not in PowerCampus
-	DELETE aIU
-	FROM [PowerCampusIdentity].[auth].[IdentityUser] aIU
+	SELECT 'DELETE' [Action]
+		,aAU.UserName
+		,aAU.AppUserId
+	FROM [PowerCampusIdentity].[auth].[AppUser] aAU
 	LEFT JOIN PersonUser PU
-		ON PU.UserName = aIU.UserName
+		ON PU.UserName = aAU.UserName
 	WHERE PU.UserName IS NULL
 		AND [Password] = '' --Only federated users
+		AND ApplicationId = @ApplicationId
+
+	--Delete users not in PowerCampus
+	DELETE aAU
+	FROM [PowerCampusIdentity].[auth].[AppUser] aAU
+	LEFT JOIN PersonUser PU
+		ON PU.UserName = aAU.UserName
+	WHERE PU.UserName IS NULL
+		AND [Password] = '' --Only federated users
+		AND ApplicationId = @ApplicationId
 
 	--Isolate users not in PowerCampusIdentity and create new UserId's
 	;WITH NewUsers_CTE
 	AS (
-		SELECT DISTINCT UserName
-		FROM #UsersInRoles
-		WHERE UserId IS NULL
+		SELECT DISTINCT UIR.UserName
+			,AppUserId
+			,E.Email
+		FROM #UsersInRoles UIR
+		LEFT JOIN [PersonUser] PU
+			ON PU.UserName = UIR.UserName
+		LEFT JOIN PEOPLE P
+			ON P.PersonId = PU.PersonId
+		LEFT JOIN EmailAddress E
+			ON E.EmailAddressId = P.PrimaryEmailId
+		WHERE AppUserId IS NULL
 		)
 	SELECT UserName
-		,NEWID() [UserId]
+		,Email
 	INTO #NewUsers
 	FROM NewUsers_CTE
+	
 
 	--Debug: Select the users we will insert
-	--SELECT 'INSERT' [Action]
-	--	,*
-	--FROM #NewUsers
+	SELECT 'INSERT' [Action]
+		,*
+	FROM #NewUsers
 
 	--Insert new users into PowerCampusIdentity
-	INSERT INTO [PowerCampusIdentity].[auth].[IdentityUser] (
+	INSERT INTO [PowerCampusIdentity].[auth].[AppUser] (
 		[ApplicationId]
-		,[UserId]
 		,[UserName]
 		,[LoweredUserName]
 		,[Email]
 		,[LoweredEmail]
 		,[Password]
-		,[LastLoginDate]
-		,[LastPasswordChangedDate]
-		,[LastLockoutDate]
-		,[IdentityUserStoreId]
+		,[ChangePasswordAtNextLogon]
+		,[CreationAppStoreId]
+		,[AuthenticationAppStoreId]
 		)
 	SELECT @ApplicationId
-		,UserId
 		,UserName
 		,LOWER(UserName)
+		,Email
 		,''
 		,''
-		,''
-		,NULL
-		,NULL
-		,NULL
-		,@IdentityUserStoreId
+		,0
+		,@CreationAppStoreId
+		,@AuthenticationAppStoreId
 	FROM #NewUsers;
 
 	--Update master list with new UserId's we just inserted
 	UPDATE UIR
-	SET UIR.UserId = NU.UserId
+	SET UIR.AppUserId = aAU.AppUserId
 	FROM #UsersInRoles UIR
 	INNER JOIN #NewUsers NU
 		ON NU.UserName = UIR.UserName
-	WHERE UIR.UserId IS NULL;
+	INNER JOIN [PowerCampusIdentity].[auth].[AppUser] aAU
+		ON aAU.UserName = NU.UserName
+	WHERE UIR.AppUserId IS NULL;
 
 	DROP TABLE #NewUsers;
 
@@ -231,43 +257,43 @@ BEGIN
 	--Temp table to hold output
 	CREATE TABLE #Changes (
 		[Action] NVARCHAR(10)
-		,UserId UNIQUEIDENTIFIER
-		,RoleId UNIQUEIDENTIFIER
+		,AppUserId INT
+		,AppRoleId INT
 		);
 	
 	--Make the actual auth.IdentityUserRole table match our calculated users-in-roles table
-	MERGE [PowerCampusIdentity].[auth].[IdentityUserRole] WITH (HOLDLOCK) AS T
+	MERGE [PowerCampusIdentity].[auth].[AppUserRole] WITH (HOLDLOCK) AS T
 	USING (
 			SELECT DISTINCT * FROM #UsersInRoles
 			) S
-	ON S.UserId = T.UserId
-		AND S.RoleId = T.RoleId
+	ON S.AppUserId = T.AppUserId
+		AND S.AppRoleId = T.AppRoleId
 	WHEN NOT MATCHED BY TARGET
-	THEN INSERT (UserId, RoleId)
-		VALUES (S.UserId, S.RoleId)
+	THEN INSERT (AppUserId, AppRoleId)
+		VALUES (S.AppUserId, S.AppRoleId)
 	WHEN NOT MATCHED BY SOURCE
-		AND T.RoleId IN (SELECT RoleId FROM #IdentityRoles) --Only edit roles that have record type mappings
+		AND T.AppRoleId IN (SELECT AppRoleId FROM #IdentityRoles) --Only edit roles that have record type mappings
 	THEN DELETE
 	OUTPUT
 		$action AS [Action]
-		,COALESCE(inserted.UserId, deleted.UserId) AS UserId
-		,COALESCE(inserted.RoleId, deleted.RoleId) AS RoleId
+		,COALESCE(inserted.AppUserId, deleted.AppUserId) AS AppUserId
+		,COALESCE(inserted.AppRoleId, deleted.AppRoleId) AS AppRoleId
 		INTO #Changes;
 	
 	--Output for debugging
-	--SELECT C.*
-	--	,aIU.UserName
-	--	,aIR.RoleName
-	--	,P.PEOPLE_ID
-	--FROM #Changes C
-	--LEFT JOIN [PowerCampusIdentity].[auth].[IdentityUser] aIU
-	--	ON aIU.UserId = C.UserId
-	--LEFT JOIN [PowerCampusIdentity].[auth].[IdentityRole] aIR
-	--	ON aIR.RoleId = C.RoleId
-	--LEFT JOIN PersonUser PU
-	--	ON PU.UserName = aIU.UserName
-	--LEFT JOIN PEOPLE P
-	--	ON P.PersonId = PU.PersonId;
+	SELECT C.*
+		,aAU.UserName
+		,aAR.[Name] [Role Name]
+		,P.PEOPLE_ID
+	FROM #Changes C
+	LEFT JOIN [PowerCampusIdentity].[auth].[AppUser] aAU
+		ON aAU.AppUserId = C.AppUserId
+	LEFT JOIN [PowerCampusIdentity].[auth].[AppRole] aAR
+		ON aAR.AppRoleId = C.AppRoleId
+	LEFT JOIN PersonUser PU
+		ON PU.UserName = aAU.UserName
+	LEFT JOIN PEOPLE P
+		ON P.PersonId = PU.PersonId;
 
 	DROP TABLE #IdentityRoles
 		,#UsersInRoles
