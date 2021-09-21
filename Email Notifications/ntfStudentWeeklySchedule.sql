@@ -1,7 +1,7 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[ntfStudentWeeklySchedule]    Script Date: 01/14/2021 10:07:19 ******/
+/****** Object:  StoredProcedure [custom].[ntfStudentWeeklySchedule]    Script Date: 2021-09-01 16:24:02 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -21,25 +21,25 @@ GO
 -- 2021-01-08 Wyatt Best:	Updated for new room name, ZOOM. Also changed hardcoded TermId to variable. Safer if we forget to update this, but dangerous if Acal dates are wrong.
 -- 2021-01-14 Wyatt Best:	New functionality to display holiday meetings being held asynchronously in their own table.
 --							Added new column to underlying view, REGULAR_DAY. Allows for easier detection of async courses as well as detecting async meetings for sections that are normally sync.
+-- 2021-08-23 Wyatt Best:	Added logic to prevent sending when between terms.
+-- 2021-08-24 Wyatt Best:	Remove health screening link.
 -- =============================================
 CREATE PROCEDURE [custom].[ntfStudentWeeklySchedule]
 AS
 BEGIN
 	SET NOCOUNT ON;
-	SET XACT_ABORT ON;--Stop on all errors.
+	SET XACT_ABORT ON; --Stop on all errors.
 
-	DECLARE @Monday DATE = dateadd(day, 1, cast(GETDATE() AS DATE)) --Intended to be run on Sunday evenings.
+	DECLARE @Monday DATE = dateadd(day, 1, cast(getdate() AS DATE)) --Intended to be run on Sunday evenings.
 		,@TermId INT = (
-			SELECT termid
+			SELECT TermId
 			FROM [custom].vwOrderedTerms
 			WHERE ACADEMIC_YEAR = dbo.fnGetAbtSetting('ACA_RECORDS', 'CURRENT_YT', 'CURRENT_YEAR')
 				AND ACADEMIC_TERM = dbo.fnGetAbtSetting('ACA_RECORDS', 'CURRENT_YT', 'CURRENT_TERM')
 			)
 		,@Subject NVARCHAR(100) = 'Class Schedule for the Week'
 		,@Body NVARCHAR(MAX) = 
-		'<p>Dear {{DisplayName}},</p>
-		<p>Here''s your class schedule for the week. Classes can be held synchronously on campus or on Zoom, or they can be held online asynchronously.</p>
-		<style type="text/css">
+		'<style type="text/css">
 			table.merged {
 				width: 100%;
 				border-width: 1px;
@@ -64,17 +64,26 @@ BEGIN
 				padding: 5px;
 			}
 		</style>
-		<h2>Classes Meeting Synchronously This Week</h2>
-		<p>Synchronous courses meet on a specific day and time.</p>
-		{{SyncSchedule}}
-		<p>Before you enter campus each day, you must fill out the <a href="https://forms.mcny.edu/screening/">health screening form.</a></p>
+		<p>Dear {{DisplayName}},</p>
+		<p>{{Intro}}</p>		
 		{{HolidayAdjustmentsHeader}}
 		{{HolidaySchedule}}
-		<h2>Classes Meeting Asynchronously</h2>
-		<p>Asynchronous format courses require various activities each week in <a href="https://moodle.mcny.edu">Moodle</a> or as directed by your professor instead of meeting on campus or on Zoom.</p>
+		<p>Your {{HolidaySnippet1}}synchronous courses, listed below, will meet on their scheduled day and time.</p>
+		{{SyncSchedule}}
+		<p>Your asynchronous courses require various activities each week in <a href="https://moodle.mcny.edu">Moodle</a> or as directed by your professor instead of meeting on campus or on Zoom.</p>
 		{{AsyncSchedule}}
 		<p>You can view schedule information any time via the calendar on the home page of <a href="https://selfservice.mcny.edu/">Self-Service</a>.</p>'
 		;
+
+	--Don't do anything if between terms
+	IF (
+			SELECT [START_DATE]
+			FROM ACADEMICCALENDAR
+			WHERE ACADEMIC_YEAR = dbo.fnGetAbtSetting('ACA_RECORDS', 'CURRENT_YT', 'CURRENT_YEAR')
+				AND ACADEMIC_TERM = dbo.fnGetAbtSetting('ACA_RECORDS', 'CURRENT_YT', 'CURRENT_TERM')
+				AND ACADEMIC_SESSION = '01'
+			) > DATEADD(day, 6, @Monday)
+		RETURN
 
 	--Query all sync section meetings for the week
 	SELECT PEOPLE_ID
@@ -91,8 +100,8 @@ BEGIN
 	WHERE TermId = @TermId
 		AND CAST(CALENDAR_DATE AS DATE) BETWEEN @Monday AND DATEADD(day, 6, @Monday) --Week range
 		AND DATEDIFF(minute, START_TIME, END_TIME) > 10;
+		--AND REGULAR_DAY <> 'DIST';
 
-	--AND REGULAR_DAY <> 'DIST';
 	--Query all async sections for the term
 	SELECT DISTINCT PEOPLE_ID
 		,EVENT_ID
@@ -120,7 +129,7 @@ BEGIN
 	SELECT 'selfservice@mcny.edu' [from]
 		,A.PEOPLE_CODE_ID [toId]
 		--,'wbest@mcny.edu' [to] --Debug
-		--,'asmith@mcny.edu' [cc] --Debug
+		--,'mmolina@mcny.edu' [cc] --Debug
 		,0 [toTypeFlag]
 		,@Subject [subject]
 		,@Body [body]
@@ -130,7 +139,7 @@ BEGIN
 		,(
 			SELECT 'merged' AS [@class]
 				,(
-					SELECT 'Course' [th]
+					SELECT 'Synchronous Courses' [th]
 						,'Section' [th]
 						,'Date' [th]
 						,'Time' [th]
@@ -177,7 +186,7 @@ BEGIN
 		,(
 			SELECT 'merged' AS [@class]
 				,(
-					SELECT 'Course' [th]
+					SELECT 'Asynchronous Courses' [th]
 						,'Section' [th]
 					FOR XML raw('tr')
 						,ELEMENTS
@@ -198,7 +207,7 @@ BEGIN
 		,(
 			SELECT 'merged' AS [@class]
 				,(
-					SELECT 'Course' [th]
+					SELECT 'Adjusted Courses' [th]
 						,'Section' [th]
 					FOR XML raw('tr')
 						,ELEMENTS
@@ -255,10 +264,23 @@ BEGIN
 	SET body = REPLACE(body, '{{DisplayName}}', DisplayName)
 
 	UPDATE #Messages
+	SET body = REPLACE(body, '{{Intro}}', CASE 
+				WHEN HolidayFlag = 1
+					THEN 'Please be aware there has been a change to your class schedule this week.'
+				ELSE 'Here''s your class schedule for the week. Classes can be held synchronously on campus or on Zoom, or they can be held online asynchronously.'
+				END)
+
+	UPDATE #Messages
+	SET body = REPLACE(body, '{{HolidaySnippet1}}', CASE 
+				WHEN HolidayFlag = 1
+					THEN 'remaining '
+				ELSE ''
+				END)
+
+	UPDATE #Messages
 	SET body = REPLACE(body, '{{HolidayAdjustmentsHeader}}', CASE 
-				WHEN [HolidayFlag] = 1
-					THEN '<h2>Temporary Holiday Adjustments</h2>
-					<p>The following courses are not meeting synchronously this week due to a holiday.
+				WHEN HolidayFlag = 1
+					THEN '<p>The following courses will not meet synchronously this week due to a holiday.
 					Instead, your instructor will require asynchronous participation (assignments, discussion forums, etc.) for this week''s attendance.
 					Please check Moodle or contact your instructor for more details.</p>'
 				ELSE ''
@@ -266,8 +288,8 @@ BEGIN
 
 	UPDATE #Messages
 	SET body = REPLACE(body, '{{HolidaySchedule}}', CASE 
-				WHEN [HolidayFlag] = 1
-					THEN HolidaySchedule
+				WHEN HolidayFlag = 1
+					THEN HolidaySchedule + '<p>All other classes will follow their regular schedule.</p>'
 				ELSE ''
 				END)
 
@@ -278,11 +300,11 @@ BEGIN
 	SET body = REPLACE(body, '{{AsyncSchedule}}', AsyncSchedule)
 
 	--Debug
-	--SELECT *
-	--FROM #Messages
+	SELECT *
+	FROM #Messages
 
 	--Send emails
-	EXEC [custom].[spSendEmails];
+	--EXEC [custom].[spSendEmails];
 
 	DROP TABLE #SectionMeetingsSync
 		,#SectionsAsync
