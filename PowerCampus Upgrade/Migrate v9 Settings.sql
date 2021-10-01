@@ -99,13 +99,13 @@ INSERT INTO SiteMapOptionRole (
 	,SiteMapRoleId
 	,IsVisible
 	)
-SELECT SMOR2.SiteMapOptionId
+SELECT SMO.SiteMapOptionId
 	,SMR.SiteMapRoleId
 	,SMOR2.IsVisible
 FROM $(pc_db_old).dbo.SiteMapOptionRole SMOR2
-INNER JOIN SiteMapOption SMO2
+INNER JOIN $(pc_db_old).dbo.SiteMapOption SMO2
 	ON SMO2.SiteMapOptionId = SMOR2.SiteMapOptionId
-INNER JOIN SiteMapRole SMR2
+INNER JOIN $(pc_db_old).dbo.SiteMapRole SMR2
 	ON SMR2.SiteMapRoleId = SMOR2.SiteMapRoleId
 LEFT JOIN SiteMapOption SMO
 	ON SMO.LinkId = SMO2.LinkId
