@@ -2,29 +2,51 @@ USE PowerCampusIdentity
 
 BEGIN TRAN
 
+--BE SURE TO REVIEW THESE VALUES!
+DECLARE @ApplicationId INT = (
+		SELECT Applicationid
+		FROM auth.AppCatalog
+		WHERE [Name] = 'SelfService'
+		)
+DECLARE @ADStoreId INT = (
+		SELECT AppStoreId
+		FROM auth.AppStore
+		WHERE ApplicationId = @ApplicationId
+			AND Mode = 2
+		)
+	,@ADFSStoreId INT = (
+		SELECT AppStoreId
+		FROM auth.AppStore
+		WHERE ApplicationId = @ApplicationId
+			AND Mode = 3
+		)
+
 --Correct username case
---Check ApplicationId first!
 UPDATE AU
 SET UserName = PU.UserName
 	,LoweredUserName = LOWER(PU.UserName)
 FROM auth.AppUser AU
 INNER JOIN campus6.dbo.PersonUser PU
 	ON PU.UserName = AU.UserName
-WHERE ApplicationId = 2
+WHERE ApplicationId = @ApplicationId
 
---Set authentication mode for regular users
+--Set authentication and creation mode mode for regular users
 UPDATE auth.AppUser
-SET AuthenticationAppStoreId = 3
+SET AuthenticationAppStoreId = @ADFSStoreId
+	,CreationAppStoreId = @ADStoreId
 WHERE ApplicationId = 2
-	AND AuthenticationAppStoreId <> 3
+	AND (
+		coalesce(AuthenticationAppStoreId, '') <> @ADFSStoreId
+		OR coalesce(CreationAppStoreId, '') <> @ADStoreId
+		)
 
 --Clean up users not existing in Campus6
 DELETE
 FROM auth.AppUser
-WHERE ApplicationId = 2
+WHERE ApplicationId = @ApplicationId
 	AND UserName NOT IN (
 		SELECT UserName
-		FROM campus6.dbo.PersonUser
+		FROM Campus6.dbo.PersonUser
 		)
 
 ROLLBACK TRAN
