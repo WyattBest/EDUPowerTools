@@ -12,6 +12,7 @@ GO
 -- Create date: 2021-10-28
 -- Description:	Batch insert into ACTIONSCHEDULE. Requires a temp table #Actions to already exists in the same session.
 --				This procedure will add ACTIONSCHEDULE_ID's to the #Actions table for the caller's use.
+--				Columns defaulted from Action Definition will remain NULL in #Actions.
 --
 -- Temp table definition
 /*
@@ -295,11 +296,11 @@ BEGIN
 		ALTER TABLE #Actions ADD [ACTIONSCHEDULE_ID] INT NULL;
 
 	--Add a primary key to #Actions
-	ALTER TABLE #Actions ADD [Key] INT IDENTITY PRIMARY KEY;
+	ALTER TABLE #Actions ADD  [tmpKey] INT IDENTITY PRIMARY KEY;
 
 	--Create a table to hold new ACTIONSCHEDULE_ID's
 	CREATE TABLE #NewActionIds (
-		[Key] INT NOT NULL
+		 [tmpKey] INT NOT NULL
 		,[ACTIONSCHEDULE_ID] INT NOT NULL
 		);
 
@@ -309,11 +310,7 @@ BEGIN
 	INTO #ActionsIntermediate
 	FROM #Actions;
 
-	--Debug
-	SELECT *
-	FROM #ActionsIntermediate;
-
-	--Insert into ACTIONSCHEDULE. A MERGE statement is used to allow returning columns we didn't insert, specifically #Actions.Key.
+	--Insert into ACTIONSCHEDULE. A MERGE statement is used to allow returning columns we didn't insert, specifically #Actions. [tmpKey].
 	MERGE INTO ACTIONSCHEDULE AS T
 	USING (
 		SELECT A.[ACTION_ID]
@@ -360,12 +357,13 @@ BEGIN
 			,[DURATION]
 			,[DOCUMENT]
 			,COALESCE(A.[Instruction], CA.[Instruction]) AS [Instruction]
-			,[Key]
+			, [tmpKey]
 		FROM #ActionsIntermediate A
 		INNER JOIN [ACTION] CA
 			ON CA.ACTION_ID = A.ACTION_ID
 		) AS A
-		ON 1 = 0 --Will never be true, so no UPDATEs will ever happen
+		--Always-false condition forces an INSERT instead of an UPDATE.
+		ON 1 = 0
 	WHEN NOT MATCHED
 		THEN
 			INSERT (
@@ -460,18 +458,18 @@ BEGIN
 				,[DOCUMENT]
 				,[Instruction]
 				)
-	OUTPUT inserted.ACTIONSCHEDULE_ID
-		,A.[Key]
+	OUTPUT A. [tmpKey]
+		,inserted.ACTIONSCHEDULE_ID
 	INTO #NewActionIds;
 
 	--Update #Actions with the new ACTIONSCHEDULE_ID's
-	--Using EXEC because the compiler doens't know that [Key] exists
+	--Using EXEC because the compiler doens't know that  [tmpKey] exists.
 	EXEC (
-			'UPDATE A
+	'UPDATE A
 	SET [ACTIONSCHEDULE_ID] = B.[ActionSchedule_Id]
 	FROM #Actions A
 	INNER JOIN #NewActionIds B
-		ON A.[Key] = B.[Key]'
+		ON A. [tmpKey] = B. [tmpKey]'
 			)
 END
 GO
