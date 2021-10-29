@@ -1,4 +1,4 @@
-USE Campus6_test
+USE Campus6
 GO
 
 SET ANSI_NULLS ON
@@ -48,7 +48,7 @@ GO
 */
 --
 -- =============================================
-ALTER PROCEDURE [custom].insActions
+CREATE PROCEDURE [custom].insActions
 AS
 BEGIN
 	SET NOCOUNT ON;
@@ -319,7 +319,7 @@ BEGIN
 			,[PEOPLE_ORG_CODE_ID]
 			,@Today AS [REQUEST_DATE]
 			,@Now AS [REQUEST_TIME]
-			,[SCHEDULED_DATE]
+			,COALESCE(A.[SCHEDULED_DATE], @Today) AS [SCHEDULED_DATE]
 			,[EXECUTION_DATE]
 			,@Today AS [CREATE_DATE]
 			,@Now AS [CREATE_TIME]
@@ -340,7 +340,7 @@ BEGIN
 			,[RATING]
 			,[RESPONSE]
 			,[CONTACT]
-			,COALESCE(@Now, A.SCHEDULED_TIME) AS [SCHEDULED_TIME]
+			,COALESCE(A.[SCHEDULED_TIME], @Now) AS [SCHEDULED_TIME]
 			,A.[NOTE]
 			,A.ACTION_ID + convert(NVARCHAR(4), datepart(yy, GETDATE())) + convert(NVARCHAR(2), datepart(mm, GETDATE())) + convert(NVARCHAR(2), datepart(dd, GETDATE())) + convert(NVARCHAR(2), datepart(hh, GETDATE())) + convert(NVARCHAR(2), datepart(mi, GETDATE())) + convert(NVARCHAR(4), datepart(ms, GETDATE())) AS [UNIQUE_KEY]
 			,COALESCE([COMPLETED], 'N') AS [COMPLETED]
