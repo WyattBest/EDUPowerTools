@@ -1,8 +1,8 @@
-USE Campus6
-
+USE [Campus6]
+GO
+/****** Object:  StoredProcedure [custom].[insAttendanceForLateRegistrants]    Script Date: 2021-11-09 16:01:36 ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
 
@@ -12,6 +12,8 @@ GO
 -- Description:	Inserts ABSENT records in TRANATTENDANCE automatically if students register after a class meeting occured.
 --				Has some logic to exclude withdrawn students, cancelled sections, sections created after attendance date, etc.
 --				Created for PowerCampus 9.1.4
+--
+-- 2021-11-09 Wyatt Best:		Put into production.
 -- =============================================
 CREATE PROCEDURE [custom].insAttendanceForLateRegistrants
 AS
@@ -77,11 +79,12 @@ BEGIN
 		,@Comment AS [COMMENTS]
 		,CALENDAR_KEY AS [CALENDAR_KEY]
 	FROM TRANSCRIPTDETAIL TD
-	INNER JOIN ACADEMIC A WITH (KEEPIDENTITY)
+	INNER JOIN ACADEMIC A
 		ON A.PEOPLE_CODE_ID = TD.PEOPLE_CODE_ID
 			AND A.ACADEMIC_YEAR = TD.ACADEMIC_YEAR
 			AND A.ACADEMIC_TERM = TD.ACADEMIC_TERM
 			AND A.ACADEMIC_SESSION = TD.ACADEMIC_SESSION
+			AND A.[STATUS] <> 'N'
 			--Exclude students who withdrew from the term
 			AND A.ENROLL_SEPARATION IN (
 				SELECT CODE_VALUE_KEY
@@ -115,7 +118,7 @@ BEGIN
 		--Exclude students who dropped section
 		AND TD.ADD_DROP_WAIT = 'A'
 		--Attendance record not exists
-		AND TA.CalendarKey IS NULL
+		AND TA.EVENT_ID IS NULL
 		--Exclude students who withdrew from the section (not dropped)
 		AND TD.FINAL_GRADE NOT IN (
 			SELECT GRADE
@@ -131,6 +134,3 @@ BEGIN
 		AND (S.CREATE_DATE + S.CREATE_TIME) < (C.CALENDAR_DATE + C.END_TIME)
 	OPTION (FORCE ORDER)
 END
-GO
-
-
