@@ -8,7 +8,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
+CREATE PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
 	,@action_name NVARCHAR(50) = NULL --Will default from Action Definition
 	,@people_code_id NVARCHAR(10)
 	,@request_date DATE = NULL
@@ -97,7 +97,7 @@ SET @instructions = nullif(@instructions, '')
 
 IF @opid = ''
 	SET @opid = 'DYNFORMS'
-SET @document = NULLIF('', @document)
+SET @document = NULLIF(@document, '')
 
 --Get current term if Use Current Term flag true
 IF @usecurrterm = 1
