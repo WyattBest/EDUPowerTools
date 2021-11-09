@@ -1,12 +1,14 @@
 USE [Campus6]
 GO
-/****** Object:  StoredProcedure [custom].[DFinsAction]    Script Date: 2021-07-09 12:20:48 ******/
+
+/****** Object:  StoredProcedure [custom].[DFinsAction]    Script Date: 2021-11-08 15:23:12 ******/
 SET ANSI_NULLS OFF
 GO
+
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
+ALTER PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
 	,@action_name NVARCHAR(50) = NULL --Will default from Action Definition
 	,@people_code_id NVARCHAR(10)
 	,@request_date DATE = NULL
@@ -31,6 +33,7 @@ CREATE PROCEDURE [custom].[DFinsAction] @action_id NVARCHAR(8)
 	,@response NVARCHAR(6) = NULL
 	,@opid NVARCHAR(8) = 'DYNFORMS'
 	,@instructions NVARCHAR(max) = NULL
+	,@document NVARCHAR(510) = NULL
 AS
 /***********************************************************************
 Description:
@@ -45,6 +48,7 @@ Created: 2020-07-09 by Wyatt Best
 							Made @sched_date required so that some submissions will silently exit. For forms that create multiple actions and may have unused rows.
 2021-05-28 Wyatt Best:		Fixed bug where COMPLETED was being inserted as blank instead of N. Caused Self-Service 9 not to display checklist items.
 2021-07-09 Wyatt Best:		Include erroring value in some custom error messages.
+2021-11-08 Wyatt Best:		Added new parameter @document. Condensed some IF...SET statements using NULLIF.
 
 Example usage:
 	EXEC [custom].DFinsAction @action_id = 'SYCVIDHS'
@@ -60,8 +64,7 @@ DECLARE @unique NVARCHAR(50)
 	,@now DATETIME = dbo.fnMakeTime(getdate())
 
 --Dynamic Forms has an annoying habit of passing blanks instead of nulls/omitting parameters
-IF @action_name = ''
-	SET @action_name = NULL
+SET @action_name = NULLIF(@action_name, '')
 
 IF @request_date = ''
 	OR @request_date IS NULL
@@ -77,21 +80,11 @@ IF @sched_date = ''
 IF @sched_time = ''
 	OR @sched_time IS NULL
 	SET @sched_time = GETDATE()
-
-IF @rating = ''
-	SET @rating = NULL
-
-IF @resp_staff = ''
-	SET @resp_staff = NULL
-
-IF @completed_by = ''
-	SET @completed_by = NULL
-
-IF @response = ''
-	SET @response = NULL
-
-IF @execution_date = ''
-	SET @execution_date = NULL
+SET @rating = NULLIF(@rating, '')
+SET @resp_staff = NULLIF(@resp_staff, '')
+SET @completed_by = NULLIF(@completed_by, '')
+SET @response = NULLIF(@response, '')
+SET @execution_date = NULLIF(@execution_date, '')
 
 IF @completed = ''
 	SET @completed = 'N'
@@ -104,6 +97,7 @@ SET @instructions = nullif(@instructions, '')
 
 IF @opid = ''
 	SET @opid = 'DYNFORMS'
+SET @document = NULLIF('', @document)
 
 --Get current term if Use Current Term flag true
 IF @usecurrterm = 1
@@ -369,7 +363,7 @@ SELECT @action_id [ACTION_ID]
 	,0 [RULE_ID]
 	,0 [SEQ_NUM]
 	,'   ' + (CASE WHEN DATEDIFF(hour, @start_time, @end_time) > 0 THEN RIGHT('  ' + CAST(FLOOR(DATEDIFF(MINUTE, @start_time, @end_time) / 60) AS NVARCHAR(10)), 2) ELSE '  ' END) + CASE WHEN DATEDIFF(MINUTE, @start_time, @end_time) > 0 THEN RIGHT('  ' + CAST(DATEDIFF(MINUTE, @start_time, @end_time) % 60 AS NVARCHAR(10)), 2) ELSE '  ' END [Duration]
-	,NULL [DOCUMENT]
+	,@document [DOCUMENT]
 	,@instructions [Instruction]
 FROM [ACTION] A
 WHERE ACTION_ID = @action_id
