@@ -7,22 +7,33 @@
 --				Will ONLY work on copies of the same database because it copies VIEW_ID without checking that it's available,
 --				copies security OPID's without checking, etc.
 --
---				To use, set the ViewID parameter.
+--				To use, set the ViewID parameter and enable SQLCMD mode.
 -- =============================================
 
 :setvar pc_db_new "Campus6"
 :setvar pc_db_old "Campus6_2020YearEnd"
 
-USE [$(pc_db_new)]
+USE [$(pc_db_old)]
 BEGIN TRAN Tran_CopyView
 
-DECLARE @ViewID INT = '??' --Change me
+DECLARE @ViewID INT = NULL --Change me
 DECLARE @ViewDBName NVARCHAR(30) = (
 		SELECT VIEW_DB_NAME
-		FROM $(pc_db_old).dbo.[VISTAVIEW]
+		FROM [VISTAVIEW]
 		WHERE VIEW_ID = @ViewID
 		)
+DECLARE @sql NVARCHAR(MAX) = (
+		SELECT [definition]
+		FROM sys.sql_modules
+		WHERE [object_id] = OBJECT_ID('dbo.' + @ViewDBName)
+		)
 
+USE [$(pc_db_new)]
+
+--Copy the actual view object
+EXEC sp_executesql @sql;
+
+--Copy metadata...
 INSERT INTO [dbo].[VISTAVIEW]
 SELECT * FROM $(pc_db_old).dbo.[VISTAVIEW]
 WHERE VIEW_ID = @ViewID
@@ -80,5 +91,6 @@ INSERT INTO [dbo].[ABT_TABLESECURITY]
 SELECT * FROM $(pc_db_old).dbo.[ABT_TABLESECURITY]
 WHERE TABLE_NAME = @ViewDBName
 	AND SECURITY_ID <>'SYSTEM'
+
 
 COMMIT TRAN Tran_CopyView
