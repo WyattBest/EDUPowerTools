@@ -6,6 +6,8 @@
 -- Description:	Restores a deleted Vista View from a database copy.
 --				Will ONLY work on copies of the same database because it copies VIEW_ID without checking that it's available,
 --				copies security OPID's without checking, etc.
+--
+--				To use, set the ViewID parameter.
 -- =============================================
 
 :setvar pc_db_new "Campus6"
@@ -14,7 +16,7 @@
 USE [$(pc_db_new)]
 BEGIN TRAN Tran_CopyView
 
-DECLARE @ViewID INT= 74
+DECLARE @ViewID INT = '??' --Change me
 DECLARE @ViewDBName NVARCHAR(30) = (
 		SELECT VIEW_DB_NAME
 		FROM $(pc_db_old).dbo.[VISTAVIEW]
