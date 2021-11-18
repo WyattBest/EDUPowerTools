@@ -1,7 +1,7 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[DFselACADEMICCurrent]    Script Date: 2021-04-20 14:20:48 ******/
+/****** Object:  StoredProcedure [custom].[DFselStudentACADEMICCurrent]    Script Date: 2021-11-18 12:39:12 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -13,13 +13,18 @@ GO
 -- Author:		Wyatt Best
 -- Create date: 2020-07-02
 -- Description:	Returns current PDC, credits, and ENROLL_SEPARATION for a student.
-
+--
 -- 2021-03-23 Archange Malvoisin:	Added field DEPARTMENT which provides student purpose in the result set. 
+-- 2021-06-24 Archange Malvoisin:   Added a fix to @StudentPCID first by padding with zeros, then by prepending 'P'
+-- 2021-11-18 Wyatt Best:			Renamed and moved PCID validation to fnValidatePeopleID().
 -- =============================================
-CREATE PROCEDURE [custom].[DFselACADEMICCurrent] @StudentPCID NVARCHAR(10)
+CREATE PROCEDURE [custom].[DFselStudentACADEMICCurrent] @StudentPCID NVARCHAR(10)
 AS
 BEGIN
 	SET NOCOUNT ON;
+
+	--Fix PCID
+	SET @StudentPCID = [custom].fnValidatePeopleID(@StudentPCID);
 
 	DECLARE @CurTermId INT = (
 			SELECT TermId

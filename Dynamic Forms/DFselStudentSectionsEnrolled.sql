@@ -1,10 +1,8 @@
 USE [Campus6]
 GO
-
-/****** Object:  StoredProcedure [custom].[DFselSectionsEnrolledPrev]    Script Date: 2020-12-08 14:50:45 ******/
+/****** Object:  StoredProcedure [custom].[DFselStudentSectionsEnrolled]    Script Date: 2021-11-18 12:42:10 ******/
 SET ANSI_NULLS ON
 GO
-
 SET QUOTED_IDENTIFIER ON
 GO
 
@@ -12,13 +10,18 @@ GO
 -- Author:		Wyatt Best
 -- Create date: 2020-12-08
 -- Description:	List of courses student is/was enrolled in. Includes faculty contact info.
---				@TermAdj can look backwards or forwards. 0=current term, -1=previous term, etc.
+--				@TermOffset can look backwards or forwards. 0=current term, -1=previous term, etc.
+--
+-- 2021-11-18 Wyatt Best:		Renamed and added fnValidatePeopleID().
 -- =============================================
-CREATE PROCEDURE [custom].[DFselSectionsEnrolled] @StudentPCID NVARCHAR(10)
-	,@TermAdj INT = 0
+CREATE PROCEDURE [custom].[DFselStudentSectionsEnrolled] @StudentPCID NVARCHAR(10)
+	,@TermOffset INT = 0
 AS
 BEGIN
 	SET NOCOUNT ON;
+
+	--Fix PCID
+	SET @StudentPCID = [custom].fnValidatePeopleID(@StudentPCID);
 
 	DECLARE @CurTermId INT = (
 			SELECT TermId
@@ -60,10 +63,7 @@ BEGIN
 		ON FE.PEOPLE_ORG_CODE_ID = oFAC.PERSON_CODE_ID
 	WHERE 1 = 1
 		AND A.PEOPLE_CODE_ID = @StudentPCID
-		AND A.TermId = (@CurTermId + @TermAdj)
+		AND A.TermId = (@CurTermId + @TermOffset)
 		AND A.[STATUS] <> 'N'
 		AND A.ENROLL_SEPARATION = 'ENRL'
 END
-GO
-
-
