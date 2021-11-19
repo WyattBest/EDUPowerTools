@@ -1,6 +1,6 @@
 USE [Campus6]
 GO
-/****** Object:  StoredProcedure [custom].[DFselStudentSectionsEnrolled]    Script Date: 2021-11-18 12:42:10 ******/
+/****** Object:  StoredProcedure [custom].[DFselStudentSectionsEnrolled]    Script Date: 2021-11-19 15:57:35 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -13,6 +13,7 @@ GO
 --				@TermOffset can look backwards or forwards. 0=current term, -1=previous term, etc.
 --
 -- 2021-11-18 Wyatt Best:		Renamed and added fnValidatePeopleID().
+-- 2021-11-19 Wyatt Best:		Added column [EventId+Section+LongName]
 -- =============================================
 CREATE PROCEDURE [custom].[DFselStudentSectionsEnrolled] @StudentPCID NVARCHAR(10)
 	,@TermOffset INT = 0
@@ -35,6 +36,7 @@ BEGIN
 		,TD.ACADEMIC_TERM
 		,TD.EVENT_ID + ' / ' + TD.EVENT_MED_NAME [EventId+Med]
 		,TD.EVENT_ID + ' / ' + TD.EVENT_LONG_NAME [EventId+Long]
+		,TD.EVENT_ID + ' / ' + TD.SECTION + ': ' + EVENT_LONG_NAME  [EventId+Section+LongName]
 		,TD.EVENT_ID
 		,TD.SECTION
 		,TD.EVENT_MED_NAME
