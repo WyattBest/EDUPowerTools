@@ -35,7 +35,7 @@ headers = {
     'Organization': org_id
 }
 
-# Get the list of score reports
+# GET the list of score reports
 params = {'status': 'NotDelivered', 'productKey': 'score-reporter'}
 r = session.get(f'{api_url}/datacenter/exports',
                 params=params, headers=headers)
@@ -45,18 +45,18 @@ if r.status_code == 200:
     score_reports = [k['uid'] for k in r_json if 'uid' in k]
     print(f'Found {len(score_reports)} score reports.')
 
-    # Get each individual score report file
+    # Fetch each individual score report file
     for report in score_reports:
         print(f'Downloading report with uid {report}')
+        # GET the AWS S3 URL for the score report
         params= {'filetype': 'csv'}
         r = session.get(f'{api_url}/datacenter/exports/{report}/download',
                         headers=headers)
         r.raise_for_status()
-        if r.status_code == 200:
-            r_json = r.json()
-            download_url = r_json['downloadUrl']
+        r_json = r.json()
+        download_url = r_json['downloadUrl']
 
-        # GET the score report file from AWS
+        # GET the actual file from AWS
         r = session.get(download_url)
         r.raise_for_status()
         report_data = r.content
