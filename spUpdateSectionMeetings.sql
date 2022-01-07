@@ -1,12 +1,13 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2021-06-14 14:50:21 ******/
+/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2022-01-07 14:30:46 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 -- =============================================
 -- Author:		Wyatt Best
@@ -23,18 +24,19 @@ GO
 --							Updated for Summer 2021.
 -- 2021-05-21 Wyatt Best:	Removed exclusion for Pathways to Success.
 -- 2021-06-14 Wyatt Best:	Corrected problem with deleted 5/31 meetings causing on-site/online cadence to be off.
+-- 2021-06-28 Wyatt Best:	Corrected problem with 7/6 meetings not deleted to make room for Monday, 7/5 translation. Moved 7/6 to 8/17 because 8/17 had been incorrectly deleted.
+-- 2021-08-18 Wyatt Best	Updated for Fall 2021. This Fall is quite simple, so all the fun code is gone. See https://github.com/WyattBest/EDUPowerTools/blob/master/spUpdateSectionMeetings.sql for old versions.
 -- =============================================
-ALTER PROCEDURE [custom].[spUpdateSectionMeetings] @AcademicYear NVARCHAR(4)
+CREATE PROCEDURE [custom].[spUpdateSectionMeetings] @AcademicYear NVARCHAR(4)
 	,@AcademicTerm NVARCHAR(10)
 AS
 BEGIN
 	SET NOCOUNT ON;
-	SET DATEFIRST 1
 
 	--Safety check to make sure procedure has been updated for the term
 	IF (
 			@AcademicYear = '2021'
-			AND @AcademicTerm = 'SUMMER'
+			AND @AcademicTerm = 'FALL'
 			)
 	BEGIN
 		BEGIN TRAN
@@ -48,64 +50,56 @@ BEGIN
 			AND DATEDIFF(minute, START_TIME, END_TIME) > 10 --Synchronous sections only
 			--AND [DAY] = 'DIST'
 
-		--Build a list of on-campus section meetings and classify according to College, Week Number, and whether that week number is even/odd.
-		SELECT S.ACADEMIC_YEAR
-			,S.ACADEMIC_TERM
-			,S.ACADEMIC_SESSION
-			,S.EVENT_ID
-			,S.EVENT_SUB_TYPE
-			,S.SECTION
-			,COLLEGE
-			,SS.BUILDING_CODE
-			,SS.ROOM_ID
-			,CALENDARDET_EVENT_KEY
-			,CALENDAR_KEY
-			,0 [TargetPattern] --Example use: Difference Schools have classes on campus on odd/even weeks.
-			,DATEPART(WEEK, CALENDAR_DATE) [WeekNumber]
-			,DATEPART(WEEK, CALENDAR_DATE) % 2 [WeekOddEven] --Test even/odd; will be aligned with TargetPattern
-			,C.CALENDAR_DATE
-		INTO #SectionMeetings
-		FROM SECTIONS S
+		--Delete holidays and extra (15th) meetings
+		DELETE C
+		FROM CALENDAR C
 		INNER JOIN SECTIONSCHEDULE SS
+			ON SS.CALENDARDET_EVENT_KEY = C.EVENT_KEY
+		INNER JOIN SECTIONS S
 			ON SS.ACADEMIC_YEAR = S.ACADEMIC_YEAR
 				AND SS.ACADEMIC_TERM = S.ACADEMIC_TERM
 				AND SS.ACADEMIC_SESSION = S.ACADEMIC_SESSION
 				AND SS.EVENT_ID = S.EVENT_ID
 				AND SS.EVENT_SUB_TYPE = S.EVENT_SUB_TYPE
 				AND SS.SECTION = S.SECTION
-		INNER JOIN CALENDAR C
-			ON SS.CALENDARDET_EVENT_KEY = C.EVENT_KEY
-		WHERE 1 = 1
-			AND S.ACADEMIC_YEAR = @AcademicYear
-			AND S.ACADEMIC_TERM = @AcademicTerm
-			--AND S.SECTION NOT LIKE 'DST%'
-			AND SS.[DAY] <> 'DIST'
-			AND SS.ROOM_ID <> 'ZOOM'
-			--AND (
-			--	S.NONTRAD_PROGRAM <> 'PTS' --Exclude Pathways to Success
-			--	OR S.NONTRAD_PROGRAM IS NULL
-			--	)
-
-		-- Debug
-		--SELECT *
-		--FROM #SectionMeetings SM
-		--ORDER BY EVENT_ID
-		--	,SECTION
-		--	,CALENDAR_DATE
-
-		--Delete holidays and extra Tuesday and Wednesday meetings
-		DELETE C
-		FROM CALENDAR C
-		JOIN SECTIONSCHEDULE SS
-			ON SS.CALENDARDET_EVENT_KEY = C.EVENT_KEY
 		WHERE C.MEETING_TYPE = 'CLASS'
-			AND EVENT_TYPE = 'COURSE'
+			AND C.EVENT_TYPE = 'COURSE'
 			AND C.CALENDAR_DATE IN (
-				'2021-05-31'
-				,'2021-08-17' --Not a holiday, but Tuesday classes would otherwise have 15 meetings
+				'2021-10-11' --Columbus Day
+				,'2021-11-25'
+				,'2021-11-26'
+				,'2021-11-27'
+				,'2021-12-14' --15th Tuesday meeting
+				,'2021-12-15' --15th Wednesday meeting
+				--,'2021-12-20' --15th Monday meeting
 				)
 			AND DATEDIFF(minute, SS.START_TIME, SS.END_TIME) > 10 --Synchronous sections only
-			--AND SS.[DAY] <> 'MON' --Don't delete classes translated from 2020-10-12
+			AND COALESCE(S.NONTRAD_PROGRAM, '') NOT IN ('LDRHS')
+
+		--Delete holidays and extra (29th) meetings from Leadership High classes, which meet twice weekly
+		DELETE C
+		FROM CALENDAR C
+		INNER JOIN SECTIONSCHEDULE SS
+			ON SS.CALENDARDET_EVENT_KEY = C.EVENT_KEY
+		INNER JOIN SECTIONS S
+			ON SS.ACADEMIC_YEAR = S.ACADEMIC_YEAR
+				AND SS.ACADEMIC_TERM = S.ACADEMIC_TERM
+				AND SS.ACADEMIC_SESSION = S.ACADEMIC_SESSION
+				AND SS.EVENT_ID = S.EVENT_ID
+				AND SS.EVENT_SUB_TYPE = S.EVENT_SUB_TYPE
+				AND SS.SECTION = S.SECTION
+		WHERE C.MEETING_TYPE = 'CLASS'
+			AND C.EVENT_TYPE = 'COURSE'
+			AND C.CALENDAR_DATE IN (
+				'2021-10-11' --Columbus Day
+				,'2021-11-25'
+				,'2021-11-26'
+				,'2021-11-27'
+				,'2021-12-16' --29th meeting (Thursday)
+				,'2021-12-20' --29th meeting (Monday)
+				)
+			AND DATEDIFF(minute, SS.START_TIME, SS.END_TIME) > 10 --Synchronous sections only
+			AND S.NONTRAD_PROGRAM = 'LDRHS'
 
 		--Delete extra Monday meetings for async sections
 		DELETE C
@@ -114,60 +108,9 @@ BEGIN
 			ON SS.CALENDARDET_EVENT_KEY = C.EVENT_KEY
 		WHERE C.MEETING_TYPE = 'CLASS'
 			AND EVENT_TYPE = 'COURSE'
-			AND C.CALENDAR_DATE IN ('2021-08-16')
-			AND DATEDIFF(minute, SS.START_TIME, SS.END_TIME) < 10 --Asynchronous sections only
+			AND C.CALENDAR_DATE IN ('2021-12-20')
+			AND DATEDIFF(minute, SS.START_TIME, SS.END_TIME) < 10;--Asynchronous sections only
 
-		--Translation Day: Move Monday 2021-07-05 sections to Tuesday 2021-07-06
-		UPDATE C
-		SET CALENDAR_DATE = '2021-07-06'
-			,DAY_OF_WEEK = 'TUE'
-		FROM CALENDAR C
-		INNER JOIN CALENDARDETAIL CD
-			ON C.EVENT_KEY = CD.EVENT_KEY
-		WHERE MEETING_TYPE = 'CLASS'
-			AND C.EVENT_TYPE = 'COURSE'
-			AND CALENDAR_DATE = '2021-07-05'
-			AND DATEDIFF(minute, C.START_TIME, C.END_TIME) > 10 --Synchronous sections only
-
-		--Move alternating weeks to ONLINE
-		UPDATE C
-		SET ORG_CODE_ID = 'O000000001'
-			,BUILDING_CODE = 'ONLINE'
-			,ROOM_ID = 'ZOOM'
-		FROM CALENDAR C
-		INNER JOIN #SectionMeetings SM
-			ON SM.CALENDAR_KEY = C.CALENDAR_KEY
-		WHERE TargetPattern <> WeekOddEven;
-
-		--Move alternating weeks to on campus (necessary for subsequent runs when the number of weeks has changed)
-		UPDATE C
-		SET BUILDING_CODE = SM.BUILDING_CODE
-			,ROOM_ID = SM.ROOM_ID
-		FROM CALENDAR C
-		INNER JOIN #SectionMeetings SM
-			ON SM.CALENDAR_KEY = C.CALENDAR_KEY
-		WHERE TargetPattern = WeekOddEven;
-
-		----Holiday: Move Monday 2021-01-18 and 2021-01-21 sections to async format
-		--UPDATE C
-		--SET ORG_CODE_ID = 'O000000001'
-		--	,BUILDING_CODE = 'ONLINE'
-		--	,ROOM_ID = 'ONLINE'
-		--	,START_TIME = '01:12'
-		--	,END_TIME = '01:13'
-		--FROM CALENDAR C
-		--INNER JOIN CALENDARDETAIL CD
-		--	ON C.EVENT_KEY = CD.EVENT_KEY
-		--WHERE MEETING_TYPE = 'CLASS'
-		--	AND C.EVENT_TYPE = 'COURSE'
-		--	AND CALENDAR_DATE IN (
-		--		'2021-01-18'
-		--		,'2021-02-15'
-		--		)
-		--	--AND DATEDIFF(minute, C.START_TIME, C.END_TIME) > 10 --Synchronous sections only
-		--	AND CD.[DAY] <> 'DIST';
-
-		--Update SCHEDULED_MEETINGS counter (for consistent display in client)
 		WITH CTE_SectionMeetings
 		AS (
 			SELECT COUNT(*) [SectionMeetings]
@@ -201,7 +144,8 @@ BEGIN
 				AND CTE.SECTION = S.SECTION
 
 		COMMIT TRAN
-
-		DROP TABLE #SectionMeetings;
+			--DROP TABLE #SectionMeetings;
 	END
 END
+GO
+
