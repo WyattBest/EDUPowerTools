@@ -1,7 +1,7 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2022-01-06 11:40:02 ******/
+/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2022-01-11 09:32:54 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -26,6 +26,8 @@ GO
 -- 2021-06-28 Wyatt Best:	Corrected problem with 7/6 meetings not deleted to make room for Monday, 7/5 translation. Moved 7/6 to 8/17 because 8/17 had been incorrectly deleted.
 -- 2021-08-18 Wyatt Best	Updated for Fall 2021. This Fall is quite simple, so all the fun code is gone. See https://github.com/WyattBest/EDUPowerTools/blob/master/spUpdateSectionMeetings.sql for old versions.
 -- 2022-01-07 Wyatt Best:	Updated for Spring 2022.
+-- 2022-01-11 Wyatt Best:	Corrected ORG_CODE_ID for classes temporarily moved online. Otherwise, they won't show on Self-Service calendar.
+--							Moved 1/18 (Tuesday) classes to 4/19 to make room for translated Monday classes.
 -- =============================================
 ALTER PROCEDURE [custom].[spUpdateSectionMeetings] @AcademicYear NVARCHAR(4)
 	,@AcademicTerm NVARCHAR(10)
@@ -43,7 +45,8 @@ BEGIN
 
 		--Update all synchronous classes to Online, Zoom for the month of Jan 2022
 		UPDATE CALENDAR
-		SET BUILDING_CODE = 'ONLINE'
+		SET ORG_CODE_ID = 'O000000001'
+			,BUILDING_CODE = 'ONLINE'
 			,ROOM_ID = 'ZOOM'
 		WHERE CALENDAR_DATE BETWEEN '2022-01-10' AND '2022-01-31'
 			AND DATEDIFF(minute, START_TIME, END_TIME) > 10 --Synchronous sections only
@@ -72,7 +75,7 @@ BEGIN
 			AND C.EVENT_TYPE = 'COURSE'
 			AND C.CALENDAR_DATE IN (
 				'2022-02-21' --President's Day
-				,'2022-04-19' --15th Tuesday meeting
+				--,'2022-04-19' --15th Tuesday meeting
 				)
 			AND DATEDIFF(minute, SS.START_TIME, SS.END_TIME) > 10 --Synchronous sections only
 			AND COALESCE(S.NONTRAD_PROGRAM, '') NOT IN ('LDRHS')
