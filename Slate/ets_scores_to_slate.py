@@ -29,7 +29,7 @@ for k, v in score_formats.items():
     print(f"Getting {k} data from ETS for {date_begin} to {date_end}...")
     client = Client(v["source"])
     ets_result = client.service.getScorelinkDataByReportDate(
-        creds[0], creds[1], date_begin, date_end
+        ets_user, ets_password, date_begin, date_end
     )
 
     if ets_result:
