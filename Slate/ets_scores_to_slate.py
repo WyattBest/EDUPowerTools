@@ -32,7 +32,14 @@ for k, v in score_formats.items():
         ets_user, ets_password, date_begin, date_end
     )
 
-    if ets_result:
+    # Appears that ETS doesn't return proper HTTP status codes, so we have to search for error strings.
+    if (
+        b"is not authenticated" in ets_result
+        or b"user name or password is incorrect" in ets_result
+    ):
+        print("ETS authentication failed.")
+
+    elif ets_result:
         # POST the scores to Slate
         print(f"Uploading {k} scores to Slate...")
         creds = (slate_user, slate_password)
