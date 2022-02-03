@@ -36,7 +36,7 @@ for k, v in score_formats.items():
         # POST the scores to Slate
         print(f"Uploading {k} scores to Slate...")
         creds = (slate_user, slate_password)
-        r = requests.post(format["destination"], auth=creds, data=ets_result)
+        r = requests.post(v["destination"], auth=creds, data=ets_result)
         r.raise_for_status()
     else:
         print(f"No {k} data found.")
