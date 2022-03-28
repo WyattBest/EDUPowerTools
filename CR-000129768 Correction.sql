@@ -7,12 +7,14 @@
 --	Please run in test environment and consider whether you really want duplicates removed before running in production.
 --	May not be effective if your collation is case-sensitive.
 --
--- Update 2017-09-08 WB: Added COALESCE functions to address comparisons.
--- Update 2018-01-02 WB: Removed EMAIL_ADDRESS comparisons, since email addresses are no longer stored in this table. This causes many more duplicates to be detected.
---						Added version check.
---						Excluded recurring addresses.
---						Added MCNY-specific line to exclude 'EMAL' code type addresses.
--- Update 2019-12-11 WB: Updated PowerCampus version numbers. Defect is still unfixed.
+-- History:
+-- 2017-09-08 WB:	Added COALESCE functions to address comparisons.
+-- 2018-01-02 WB:	Removed EMAIL_ADDRESS comparisons, since email addresses are no longer stored in this table. This causes many more duplicates to be detected.
+--					Added version check.
+--					Excluded recurring addresses.
+--					Added MCNY-specific line to exclude 'EMAL' code type addresses.
+-- 2019-12-11 WB:	Updated PowerCampus version numbers. Defect is still unfixed.
+-- 2022-03-28 WB:	Updated PowerCampus version numbers.
 -------------------------------------
 
 USE Campus6
@@ -20,7 +22,7 @@ DECLARE @Rowcount INT
 
 IF (SELECT
 		CASE WHEN PARSENAME(SETTING,1) >= 0
-			AND PARSENAME(SETTING,2) = 0
+			AND PARSENAME(SETTING,2) = 1
 			AND PARSENAME(SETTING,3) = 9
 			THEN 1 ELSE 0
 		END AS VersionCheck
@@ -187,7 +189,7 @@ IF (SELECT
 	
 			DROP TABLE #GoodAddress
 			PRINT ''
-		--ROLLBACK TRAN; PRINT 'Transaction rolled back. Please check output, then comment out this line.'
-		COMMIT TRAN; PRINT 'Transaction committed.'
+		ROLLBACK TRAN; PRINT 'Transaction rolled back. Please check output, then comment out this line.'
+		--COMMIT TRAN; PRINT 'Transaction committed.'
 	END;
 ELSE PRINT 'This script is only designed to work with PowerCampus version 9.0.x'
