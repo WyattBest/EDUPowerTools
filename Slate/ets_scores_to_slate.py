@@ -15,11 +15,11 @@ slate_password = "a password"
 score_formats = {
     "GRE": {
         "source": "https://datamanager.ets.org/GREWebService/GREEdm.wsdl",
-        "destination": "slate source format URL",
+        "destination": "https://apply.myschool.edu/manage/service/import?cmd=load&format=<guid>",
     },
     "TOEFL": {
         "source": "https://datamanager.ets.org/TOEFLWebService/TOEFLEdm.wsdl",
-        "destination": "slate source format URL",
+        "destination": "https://apply.myschool.edu/manage/service/import?cmd=load&format=<guid>",
     },
 }
 
