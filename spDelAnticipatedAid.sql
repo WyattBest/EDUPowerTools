@@ -1,5 +1,7 @@
 USE [Campus6]
+GO
 
+/****** Object:  StoredProcedure [custom].[spDelAnticipatedAid]    Script Date: 06/15/2022 11:40:19 ******/
 SET ANSI_NULLS ON
 GO
 
@@ -11,13 +13,23 @@ GO
 -- Create date: 2021-12-06
 -- Description:	Deletes all batches containing anticipated aid records.
 --				Intended to be run before importing fresh anticipated aid.
+--
+-- 2022-06-15	Wyatt Best: Added ability to ignore a list of aid codes to accommodate manual loading from non-PowerFAIDS sources.
+--							Such aid needs to be loaded in its own batch.
 -- =============================================
-CREATE PROCEDURE [custom].spDelAnticipatedAid
+CREATE PROCEDURE [custom].[spDelAnticipatedAid]
 AS
 BEGIN
 	SET NOCOUNT ON;
 
 	BEGIN TRAN TranDelAnticipatedAid;
+
+	DECLARE @IgnoredAidCodes TABLE (ChargeCreditCode NVARCHAR(10))
+
+	INSERT INTO @IgnoredAidCodes
+	VALUES ('AIDGTAPSP')
+		,('AIDGTAPSU')
+		,('AIDGTAPFA')
 
 	BEGIN TRY
 		DECLARE @BatchNumber NVARCHAR(20)
@@ -27,6 +39,10 @@ BEGIN
 		INTO #AnticBatches
 		FROM CHARGECREDIT
 		WHERE ANTICIPATED_FLAG = 'Y'
+			AND CHARGE_CREDIT_CODE NOT IN (
+				SELECT ChargeCreditCode
+				FROM @IgnoredAidCodes
+				)
 
 		--Loop through all the batches with anticipated aid and delete them
 		WHILE EXISTS (
@@ -127,6 +143,3 @@ BEGIN
 	IF @@TRANCOUNT > 0
 		COMMIT TRAN TranDelAnticipatedAid;
 END
-GO
-
-
