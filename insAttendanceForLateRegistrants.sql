@@ -1,6 +1,6 @@
 USE [Campus6]
 GO
-/****** Object:  StoredProcedure [custom].[insAttendanceForLateRegistrants]    Script Date: 2021-11-09 16:01:36 ******/
+/****** Object:  StoredProcedure [custom].[insAttendanceForLateRegistrants]    Script Date: 2022-09-27 14:35:06 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
@@ -14,8 +14,9 @@ GO
 --				Created for PowerCampus 9.1.4
 --
 -- 2021-11-09 Wyatt Best:		Put into production.
+-- 2022-09-27 Wyatt Best:		Added PRIMARY_FLAG = 'Y' to prevent duplicate insertions.
 -- =============================================
-CREATE PROCEDURE [custom].insAttendanceForLateRegistrants
+ALTER PROCEDURE [custom].[insAttendanceForLateRegistrants]
 AS
 BEGIN
 	SET NOCOUNT ON;
@@ -85,6 +86,7 @@ BEGIN
 			AND A.ACADEMIC_TERM = TD.ACADEMIC_TERM
 			AND A.ACADEMIC_SESSION = TD.ACADEMIC_SESSION
 			AND A.[STATUS] <> 'N'
+			AND A.PRIMARY_FLAG= 'Y'
 			--Exclude students who withdrew from the term
 			AND A.ENROLL_SEPARATION IN (
 				SELECT CODE_VALUE_KEY
