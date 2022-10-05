@@ -1,12 +1,13 @@
 USE [Campus6]
 GO
 
-/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2022-01-11 09:32:54 ******/
+/****** Object:  StoredProcedure [custom].[spUpdateSectionMeetings]    Script Date: 2022-10-05 09:21:17 ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 -- =============================================
 -- Author:		Wyatt Best
@@ -28,6 +29,7 @@ GO
 -- 2022-01-07 Wyatt Best:	Updated for Spring 2022.
 -- 2022-01-11 Wyatt Best:	Corrected ORG_CODE_ID for classes temporarily moved online. Otherwise, they won't show on Self-Service calendar.
 --							Moved 1/18 (Tuesday) classes to 4/19 to make room for translated Monday classes.
+-- 2022-05-06 Wyatt Best:	Updated for Summer 2022.
 -- =============================================
 ALTER PROCEDURE [custom].[spUpdateSectionMeetings] @AcademicYear NVARCHAR(4)
 	,@AcademicTerm NVARCHAR(10)
@@ -38,18 +40,10 @@ BEGIN
 	--Safety check to make sure procedure has been updated for the term
 	IF (
 			@AcademicYear = '2022'
-			AND @AcademicTerm = 'SPRING'
+			AND @AcademicTerm = 'SUMMER'
 			)
 	BEGIN
 		BEGIN TRAN
-
-		--Update all synchronous classes to Online, Zoom for the month of Jan 2022
-		UPDATE CALENDAR
-		SET ORG_CODE_ID = 'O000000001'
-			,BUILDING_CODE = 'ONLINE'
-			,ROOM_ID = 'ZOOM'
-		WHERE CALENDAR_DATE BETWEEN '2022-01-10' AND '2022-01-31'
-			AND DATEDIFF(minute, START_TIME, END_TIME) > 10 --Synchronous sections only
 
 		--Update room ONLINE to ZOOM for fully online, synchronous classes
 		UPDATE SECTIONSCHEDULE
@@ -74,32 +68,39 @@ BEGIN
 		WHERE C.MEETING_TYPE = 'CLASS'
 			AND C.EVENT_TYPE = 'COURSE'
 			AND C.CALENDAR_DATE IN (
-				'2022-02-21' --President's Day
+				'2022-05-31' --Memorial Day classes being moved to this Tuesday
+				,'2022-06-22' --Juneteenth classes being moved to this Wednesday
+				,'2022-07-04' --Independence Day
 				--,'2022-04-19' --15th Tuesday meeting
 				)
 			AND DATEDIFF(minute, SS.START_TIME, SS.END_TIME) > 10 --Synchronous sections only
+			--Don't delete classes translated from Mondays
+			AND (
+				SS.[DAY] <> 'MON'
+				OR C.CALENDAR_DATE = '2022-07-04' --Independence Day
+				)
 			AND COALESCE(S.NONTRAD_PROGRAM, '') NOT IN ('LDRHS')
 
 		--Delete holidays from Leadership High classes, which meet twice weekly
-		DELETE C
-		FROM CALENDAR C
-		INNER JOIN SECTIONSCHEDULE SS
-			ON SS.CALENDARDET_EVENT_KEY = C.EVENT_KEY
-		INNER JOIN SECTIONS S
-			ON SS.ACADEMIC_YEAR = S.ACADEMIC_YEAR
-				AND SS.ACADEMIC_TERM = S.ACADEMIC_TERM
-				AND SS.ACADEMIC_SESSION = S.ACADEMIC_SESSION
-				AND SS.EVENT_ID = S.EVENT_ID
-				AND SS.EVENT_SUB_TYPE = S.EVENT_SUB_TYPE
-				AND SS.SECTION = S.SECTION
-		WHERE C.MEETING_TYPE = 'CLASS'
-			AND C.EVENT_TYPE = 'COURSE'
-			AND C.CALENDAR_DATE IN (
-				'2022-01-17' --MLK Day
-				,'2022-02-21' --President's Day
-				)
-			AND DATEDIFF(minute, SS.START_TIME, SS.END_TIME) > 10 --Synchronous sections only
-			AND S.NONTRAD_PROGRAM = 'LDRHS'
+		--DELETE C
+		--FROM CALENDAR C
+		--INNER JOIN SECTIONSCHEDULE SS
+		--	ON SS.CALENDARDET_EVENT_KEY = C.EVENT_KEY
+		--INNER JOIN SECTIONS S
+		--	ON SS.ACADEMIC_YEAR = S.ACADEMIC_YEAR
+		--		AND SS.ACADEMIC_TERM = S.ACADEMIC_TERM
+		--		AND SS.ACADEMIC_SESSION = S.ACADEMIC_SESSION
+		--		AND SS.EVENT_ID = S.EVENT_ID
+		--		AND SS.EVENT_SUB_TYPE = S.EVENT_SUB_TYPE
+		--		AND SS.SECTION = S.SECTION
+		--WHERE C.MEETING_TYPE = 'CLASS'
+		--	AND C.EVENT_TYPE = 'COURSE'
+		--	AND C.CALENDAR_DATE IN (
+		--		'2022-01-17' --MLK Day
+		--		,'2022-02-21' --President's Day
+		--		)
+		--	AND DATEDIFF(minute, SS.START_TIME, SS.END_TIME) > 10 --Synchronous sections only
+		--	AND S.NONTRAD_PROGRAM = 'LDRHS'
 
 		--Delete extra Monday meetings for async sections
 		DELETE C
@@ -108,20 +109,32 @@ BEGIN
 			ON SS.CALENDARDET_EVENT_KEY = C.EVENT_KEY
 		WHERE C.MEETING_TYPE = 'CLASS'
 			AND EVENT_TYPE = 'COURSE'
-			AND C.CALENDAR_DATE IN ('2022-04-18')
+			AND C.CALENDAR_DATE IN ('2022-08-15')
 			AND DATEDIFF(minute, SS.START_TIME, SS.END_TIME) < 10 --Asynchronous sections only
 
-		--Translation Day: Move Monday 2022-01-17 sections to Tuesday 2022-01-18
+		--Translation Day: Move Monday 2022-05-30 sections to Tuesday 2022-05-31
 		UPDATE C
-		SET CALENDAR_DATE = '2022-01-18'
+		SET CALENDAR_DATE = '2022-05-31'
 			,DAY_OF_WEEK = 'TUE'
 		FROM CALENDAR C
 		INNER JOIN CALENDARDETAIL CD
 			ON C.EVENT_KEY = CD.EVENT_KEY
 		WHERE MEETING_TYPE = 'CLASS'
 			AND C.EVENT_TYPE = 'COURSE'
-			AND CALENDAR_DATE = '2022-01-17'
-			AND DATEDIFF(minute, C.START_TIME, C.END_TIME) > 10; --Synchronous sections only
+			AND CALENDAR_DATE = '2022-05-30'
+			AND DATEDIFF(minute, C.START_TIME, C.END_TIME) > 10 --Synchronous sections only
+
+		--Translation Day: Move Monday 2022-06-20 sections to Wednesday 2022-06-22
+		UPDATE C
+		SET CALENDAR_DATE = '2022-06-22'
+			,DAY_OF_WEEK = 'WED'
+		FROM CALENDAR C
+		INNER JOIN CALENDARDETAIL CD
+			ON C.EVENT_KEY = CD.EVENT_KEY
+		WHERE MEETING_TYPE = 'CLASS'
+			AND C.EVENT_TYPE = 'COURSE'
+			AND CALENDAR_DATE = '2022-06-20'
+			AND DATEDIFF(minute, C.START_TIME, C.END_TIME) > 10;--Synchronous sections only
 
 		--Update count of scheduled meetings
 		WITH CTE_SectionMeetings
@@ -159,3 +172,5 @@ BEGIN
 		COMMIT TRAN
 	END
 END
+GO
+
