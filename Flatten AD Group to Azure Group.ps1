@@ -1,8 +1,11 @@
+###########
+### Synchronize the contents of multiple AD groups to a single Azure AD group. Flatten any nested AD groups.
+############
 Import-Module ActiveDirectory
 
 ######## Environment variables
+$SecurityGroups = "MyGroup1", "MyGroup2" # Array of AD group names
 $AzGroup = "<guid>" # ObjectId of Azure group
-$SecurityGroup = "MyGroup" # Name of AD group
 
 ######## Establish connection to Azure
 # There are better ways to do this, such as passing in credentials from Azure secure storage at runtime
@@ -12,8 +15,10 @@ Connect-AzureAD -Credential $azdcred
 
 ######## Get contents of AD and Azure groups
 try {
-    $Group = Get-ADGroup $SecurityGroup
-    $ADUsers = Get-ADGroupMember -Identity $Group -Recursive | Get-ADUser #| Get-AzureADUser -ObjectId {$_.UserPrincipalName} | Select-Object -Property UserPrincipalName, ObjectId
+    foreach ($SG in $SecurityGroups) {
+        $Group = Get-ADGroup $SecurityGroup
+        $ADUsers += Get-ADGroupMember -Identity $Group -Recursive | Get-ADUser #| Get-AzureADUser -ObjectId {$_.UserPrincipalName} | Select-Object -Property UserPrincipalName, ObjectId
+    }
     Write-Output ""
     Write-Output "AD Users"
     Write-Output "--------"
