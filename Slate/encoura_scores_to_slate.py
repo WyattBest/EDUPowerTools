@@ -1,6 +1,9 @@
 import requests
 import json
 
+# This script is open-source and free for anyone to use and modify.
+# Wish someone else could handle this for you for a reasonable fee, say, $20/mo? Contact solutions📧reworkflow.com
+
 # Encoura settings
 org_id = 'guid'
 api_user = 'username'
