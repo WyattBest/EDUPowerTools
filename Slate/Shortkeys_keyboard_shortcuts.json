@@ -75,7 +75,7 @@
     "key": "shift+e",
     "label": "New Export",
     "action": "javascript",
-    "code": "$('.toolbox_element.type_export').last().click();",
+    "code": "$('.toolbox_element.type_export, .query_add_export[title=\"Export\"]').last().click();",
     "activeInInputs": false,
     "blacklist": "whitelist",
     "sites": "https://*/manage/*",
