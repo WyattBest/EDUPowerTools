@@ -1,0 +1,86 @@
+[
+  {
+    "key": "ctrl+shift+s",
+    "label": "Default Button",
+    "action": "javascript",
+    "sites": "https://*/manage/*",
+    "sitesArray": [
+      "https://*/manage/*"
+    ],
+    "code": "$('button.default').last().click();",
+    "activeInInputs": true,
+    "blacklist": "whitelist"
+  },
+  {
+    "key": "ctrl+shift+f",
+    "label": "New Filter",
+    "action": "javascript",
+    "code": "document.getElementsByClassName('toolbox_element type_filter')[0].scrollIntoView({block:'center'});\n$('.toolbox_element.type_filter').last().click();",
+    "activeInInputs": true,
+    "blacklist": "whitelist",
+    "sites": "https://*/manage/*",
+    "sitesArray": [
+      "https://*/manage/*"
+    ]
+  },
+  {
+    "label": "Go up breadcrumb",
+    "key": "f4",
+    "action": "javascript",
+    "activeInInputs": false,
+    "blacklist": "whitelist",
+    "sites": "https://*/manage/*",
+    "code": "$('#content .breadcrumb a').toArray().pop().click();",
+    "sitesArray": [
+      "https://*/manage/*"
+    ]
+  },
+  {
+    "key": "f2",
+    "activeInInputs": true,
+    "blacklist": "whitelist",
+    "label": "Top Action Link",
+    "action": "javascript",
+    "code": "$('.action-links a')[0].click();",
+    "sites": "https://*/manage/*",
+    "sitesArray": [
+      "https://*/manage/*"
+    ]
+  },
+  {
+    "key": "f1",
+    "label": "Add Join",
+    "action": "javascript",
+    "code": "$('div[data-type=\"join\"][title=\"Join\"], div.type_join').toArray().pop().click();",
+    "activeInInputs": true,
+    "blacklist": "whitelist",
+    "sites": "https://*/manage/*",
+    "sitesArray": [
+      "https://*/manage/*"
+    ]
+  },
+  {
+    "key": "f7",
+    "label": "Display SQL",
+    "action": "javascript",
+    "activeInInputs": true,
+    "code": "$('a:contains(\"Display SQL\")').click();",
+    "blacklist": "whitelist",
+    "sites": "https://*/manage/*",
+    "sitesArray": [
+      "https://*/manage/*"
+    ]
+  },
+  {
+    "key": "shift+e",
+    "label": "New Export",
+    "action": "javascript",
+    "code": "$('.toolbox_element.type_export').last().click();",
+    "activeInInputs": false,
+    "blacklist": "whitelist",
+    "sites": "https://*/manage/*",
+    "sitesArray": [
+      "https://*/manage/*"
+    ]
+  }
+]
