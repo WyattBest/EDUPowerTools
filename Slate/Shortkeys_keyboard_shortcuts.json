@@ -82,5 +82,29 @@
     "sitesArray": [
       "https://*/manage/*"
     ]
+  },
+  {
+    "activeInInputs": true,
+    "action": "javascript",
+    "code": "$('.search_part.search_matches')[0].click()",
+    "blacklist": "whitelist",
+    "sites": "https://*/manage/*",
+    "label": "Select first query part result",
+    "key": "ctrl+shift+d",
+    "sitesArray": [
+      "https://*/manage/*"
+    ]
+  },
+  {
+    "activeInInputs": true,
+    "action": "javascript",
+    "code": "FW.Lazy.Popup('/manage/query/query?cmd=edit&folder=Temp');",
+    "blacklist": "whitelist",
+    "sites": "https://*/manage/*",
+    "label": "New Quick Query",
+    "key": "alt+q",
+    "sitesArray": [
+      "https://*/manage/*"
+    ]
   }
 ]
