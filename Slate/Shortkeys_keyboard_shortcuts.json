@@ -106,5 +106,18 @@
     "sitesArray": [
       "https://*/manage/*"
     ]
+  },
+  {
+    "key": "ctrl+d",
+    "label": "Duplicate Tab",
+    "action": "javascript",
+    "activeInInputs": true,
+    "blacklist": "whitelist",
+    "sites": "https://*/manage/*",
+    "code": "window.open(window.location);",
+    "sitesArray": [
+      "https://*/manage/*"
+    ]
   }
 ]
+
