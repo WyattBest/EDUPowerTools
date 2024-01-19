@@ -3,7 +3,6 @@ import datetime
 import requests
 
 # This script is open-source and free for anyone to use and modify.
-# Wish someone else could handle this for you for a reasonable fee, say, $20/mo? Contact solutions📧reworkflow.com
 
 # ETS settings
 ets_user = "a user"
