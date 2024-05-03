@@ -14,7 +14,7 @@ with pysftp.Connection('transfer.nbspayments.com', username='<FTP username>', pr
 
     # listdir. For each file, download file and remove server copy.
     for attr in sftp.listdir_attr():
-        # S_ISREG is a low-level function that identifies file objects
+        # Is this a file? (vs directory, named pipe, block device, or other weird object)
         if S_ISREG(attr.st_mode):
             sftp.get(remotepath=attr.filename, localpath=dir_local +
                      attr.filename, preserve_mtime=True)
