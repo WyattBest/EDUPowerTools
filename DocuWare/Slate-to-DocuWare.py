@@ -58,8 +58,11 @@ try:
             os.remove(cwd + remote_file)
 
             # Move the extracted files to the target directory
+            ii = 0
             for file in os.listdir(cwd):
+                ii += 1
                 shutil.move(cwd + file, config["docuware"]["dir"] + file)
+            print(f"Extracted and moved {ii} files.")
 
             # Delete file from the remote server
             print(f"Deleting file from server: {remote_file}")
@@ -72,7 +75,7 @@ try:
         else:
             print(f"Skipping file: {remote_file}")
 
-    print(f"Processed {i} files.")
+    print(f"Processed {i} archive.")
 except Exception as e:
     import smtplib
     import datetime
